@@ -24,13 +24,13 @@ struct SealOfTheCrusader : public AuraScript
 {
     void OnApply(Aura* aura, bool apply) const override
     {
-        if (aura->GetEffIndex() != EFFECT_INDEX_1)
-            return;
+        // if (aura->GetEffIndex() != EFFECT_INDEX_1)
+        //     return;
 
-        // Seal of the Crusader damage reduction
-        // SotC increases attack speed but reduces damage to maintain the same DPS
-        float reduction = (-100.0f * aura->GetModifier()->m_amount) / (aura->GetModifier()->m_amount + 100.0f);
-        aura->GetTarget()->HandleStatModifier(UNIT_MOD_DAMAGE_MAINHAND, TOTAL_PCT, reduction, apply);
+        // // Seal of the Crusader damage reduction
+        // // SotC increases attack speed but reduces damage to maintain the same DPS
+        // float reduction = (-100.0f * aura->GetModifier()->m_amount) / (aura->GetModifier()->m_amount + 100.0f);
+        // aura->GetTarget()->HandleStatModifier(UNIT_MOD_DAMAGE_MAINHAND, TOTAL_PCT, reduction, apply);
     }
 };
 

@@ -118,6 +118,11 @@ struct SetupRogue : public AuraScript
     }
 };
 
+// 13877 - Blade Flurry
+struct BladeFlurryRogue : public AuraScript {
+
+};
+
 void LoadRogueScripts()
 {
     RegisterSpellScript<Preparation>("spell_preparation");
@@ -126,4 +131,5 @@ void LoadRogueScripts()
     RegisterSpellScript<SapRogue>("spell_sap");
     RegisterSpellScript<ImprovedSap>("spell_improved_sap");
     RegisterSpellScript<SetupRogue>("spell_setup_rogue");
+    RegisterSpellScript<BladeFlurryRogue>("spell_rogue_blade_flurry");
 }
