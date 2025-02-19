@@ -137,6 +137,13 @@ struct AuraScript
     virtual uint32 GetAuraScriptCustomizationValue(Aura* /*aura*/) const { return 0; }
 };
 
+struct UnitScript {
+    virtual ~UnitScript() = default;
+
+    // called on damage done
+    virtual void OnDealDamage(Unit* /*attacker*/, Unit* /*victim*/, uint32 /*damage*/) const {}
+};
+
 class ScriptStorage
 {
     public:
@@ -148,22 +155,28 @@ class SpellScriptMgr
     public:
         static SpellScript* GetSpellScript(uint32 spellId);
         static AuraScript* GetAuraScript(uint32 spellId);
+        static UnitScript* GetUnitScript(uint32 spellId);
 
         static void SetSpellScript(std::string scriptName, SpellScript* script);
         static void SetAuraScript(std::string scriptName, AuraScript* script);
+        static void SetUnitScript(std::string scriptName, UnitScript* script);
 
         static void LoadScripts();
     private:
         static SpellScript* GetSpellScript(std::string scriptName);
         static AuraScript* GetAuraScript(std::string scriptName);
+        static UnitScript* GetUnitScript(std::string scriptName);
 
         static void SetSpellScript(uint32 spellId, SpellScript* script);
         static void SetAuraScript(uint32 spellId, AuraScript* script);
+        static void SetUnitScript(uint32 spellId, AuraScript* script);
 
         static std::map<uint32, SpellScript*> m_spellScriptMap;
         static std::map<uint32, AuraScript*> m_auraScriptMap;
+        static std::map<uint32, UnitScript*> m_auraScriptMap;
         static std::map<std::string, std::unique_ptr<SpellScript>> m_spellScriptStringMap;
         static std::map<std::string, std::unique_ptr<AuraScript>> m_auraScriptStringMap;
+        static std::map<std::string, std::unique_ptr<UnitScript>> m_auraScriptStringMap;
 };
 
 // note - linux name mangling bugs out if two script templates have same class name - avoid it
@@ -175,6 +188,8 @@ void RegisterSpellScript(std::string stringName)
         SpellScriptMgr::SetSpellScript(stringName, new T());
     if constexpr (std::is_base_of<AuraScript, T>::value)
         SpellScriptMgr::SetAuraScript(stringName, new T());
+    if constexpr (std::is_base_of<AuraScript, T>::value)
+        SpellScriptMgr::SetUnitScript(stringName, new T());
 }
 
 #endif // SPELLSCRIPT_H
