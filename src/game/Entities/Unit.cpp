@@ -7491,17 +7491,17 @@ uint32 Unit::MeleeDamageBonusDone(Unit* victim, uint32 pdamage, WeaponAttackType
                 continue;
             switch (i->GetSpellProto()->Id)
             {
-                case 20162: // Seal of the Crusader - all ranks
-                case 20305:
-                case 20306:
-                case 20307:
-                case 20308:
-                case 21082:
-                case 27158:
-                {
-                    DoneTotalMod *= 1.4f;
-                    break;
-                }
+                // case 20162: // Seal of the Crusader - all ranks
+                // case 20305:
+                // case 20306:
+                // case 20307:
+                // case 20308:
+                // case 21082:
+                // case 27158:
+                // {
+                //     DoneTotalMod *= 1.4f;
+                //     break;
+                // }
             }
         }
     }
