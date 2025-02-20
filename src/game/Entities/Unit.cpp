@@ -1006,6 +1006,14 @@ uint32 Unit::DealDamage(Unit* dealer, Unit* victim, uint32 damage, CleanDamage c
 
     DEBUG_FILTER_LOG(LOG_FILTER_DAMAGE, "DealDamageEnd returned %d damage", damage);
 
+    // run through any damage scripts
+    auto unitScripts = SpellScriptMgr::GetUnitScripts();
+    if (!unitScripts.empty()) {
+        for(const auto& script : unitScripts) {
+            script->OnDealDamage(dealer, victim, damage);
+        }
+    }
+
     return damage;
 }
 

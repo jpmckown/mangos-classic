@@ -156,6 +156,7 @@ class SpellScriptMgr
         static SpellScript* GetSpellScript(uint32 spellId);
         static AuraScript* GetAuraScript(uint32 spellId);
         static UnitScript* GetUnitScript(uint32 spellId);
+        static std::vector<UnitScript*> GetUnitScripts();
 
         static void SetSpellScript(std::string scriptName, SpellScript* script);
         static void SetAuraScript(std::string scriptName, AuraScript* script);
@@ -169,14 +170,14 @@ class SpellScriptMgr
 
         static void SetSpellScript(uint32 spellId, SpellScript* script);
         static void SetAuraScript(uint32 spellId, AuraScript* script);
-        static void SetUnitScript(uint32 spellId, AuraScript* script);
+        static void SetUnitScript(uint32 spellId, UnitScript* script);
 
         static std::map<uint32, SpellScript*> m_spellScriptMap;
         static std::map<uint32, AuraScript*> m_auraScriptMap;
-        static std::map<uint32, UnitScript*> m_auraScriptMap;
+        static std::map<uint32, UnitScript*> m_unitScriptMap;
         static std::map<std::string, std::unique_ptr<SpellScript>> m_spellScriptStringMap;
         static std::map<std::string, std::unique_ptr<AuraScript>> m_auraScriptStringMap;
-        static std::map<std::string, std::unique_ptr<UnitScript>> m_auraScriptStringMap;
+        static std::map<std::string, std::unique_ptr<UnitScript>> m_unitScriptStringMap;
 };
 
 // note - linux name mangling bugs out if two script templates have same class name - avoid it
@@ -188,7 +189,7 @@ void RegisterSpellScript(std::string stringName)
         SpellScriptMgr::SetSpellScript(stringName, new T());
     if constexpr (std::is_base_of<AuraScript, T>::value)
         SpellScriptMgr::SetAuraScript(stringName, new T());
-    if constexpr (std::is_base_of<AuraScript, T>::value)
+    if constexpr (std::is_base_of<UnitScript, T>::value)
         SpellScriptMgr::SetUnitScript(stringName, new T());
 }
 
