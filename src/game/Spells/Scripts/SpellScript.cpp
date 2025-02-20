@@ -21,9 +21,11 @@
 
 std::map<uint32, SpellScript*> SpellScriptMgr::m_spellScriptMap {};
 std::map<uint32, AuraScript*> SpellScriptMgr::m_auraScriptMap {};
+std::map<uint32, UnitScript*> SpellScriptMgr::m_unitScriptMap {};
 
 std::map<std::string, std::unique_ptr<SpellScript>> SpellScriptMgr::m_spellScriptStringMap {};
 std::map<std::string, std::unique_ptr<AuraScript>> SpellScriptMgr::m_auraScriptStringMap {};
+std::map<std::string, std::unique_ptr<UnitScript>> SpellScriptMgr::m_unitScriptStringMap {};
 
 SpellScript* SpellScriptMgr::GetSpellScript(uint32 spellId)
 {
@@ -51,6 +53,10 @@ void SpellScriptMgr::SetAuraScript(std::string scriptName, AuraScript* script)
     m_auraScriptStringMap.emplace(scriptName, script);
 }
 
+void SpellScriptMgr::SetUnitScript(std::string scriptName, UnitScript* script) {
+    m_unitScriptStringMap.emplace(scriptName, script);
+}
+
 extern void LoadDruidScripts();
 extern void LoadHunterScripts();
 extern void LoadMageScripts();
@@ -60,6 +66,8 @@ extern void LoadRogueScripts();
 extern void LoadShamanScripts();
 extern void LoadWarlockScripts();
 extern void LoadWarriorScripts();
+
+extern void LoadInstanceScripts();
 
 void SpellScriptMgr::LoadScripts()
 {
@@ -73,6 +81,8 @@ void SpellScriptMgr::LoadScripts()
     LoadShamanScripts();
     LoadWarlockScripts();
     LoadWarriorScripts();
+
+    LoadInstanceScripts();
 
     // load names from DB and pair names to Ids
     std::unique_ptr<QueryResult> result(WorldDatabase.Query("SELECT Id, ScriptName FROM spell_scripts"));
@@ -95,6 +105,8 @@ void SpellScriptMgr::LoadScripts()
                 SetSpellScript(spellId, script), found = true;
             if (AuraScript* script = GetAuraScript(scriptName))
                 SetAuraScript(spellId, script), found = true;
+            if (UnitScript* script = GetUnitScript(scriptName))
+                SetUnitScript(spellId, script), found = true;
 
             if (!found)
             {
@@ -121,6 +133,21 @@ AuraScript* SpellScriptMgr::GetAuraScript(std::string scriptName)
     return nullptr;
 }
 
+UnitScript* SpellScriptMgr::GetUnitScript(std::string scriptName) {
+    auto itr = m_unitScriptStringMap.find(scriptName);
+    if (itr != m_unitScriptStringMap.end())
+        return (*itr).second.get();
+    return nullptr;
+}
+
+std::vector<UnitScript*> SpellScriptMgr::GetUnitScripts() {
+    std::vector<UnitScript*> scripts;
+    for (const auto& pair: m_unitScriptMap) {
+        scripts.push_back(pair.second);
+    }
+    return scripts;
+}
+
 void SpellScriptMgr::SetSpellScript(uint32 spellId, SpellScript* script)
 {
     m_spellScriptMap.emplace(spellId, script);
@@ -129,4 +156,9 @@ void SpellScriptMgr::SetSpellScript(uint32 spellId, SpellScript* script)
 void SpellScriptMgr::SetAuraScript(uint32 spellId, AuraScript* script)
 {
     m_auraScriptMap.emplace(spellId, script);
+}
+
+void SpellScriptMgr::SetUnitScript(uint32 spellId, UnitScript* script)
+{
+    m_unitScriptMap.emplace(spellId, script);
 }
