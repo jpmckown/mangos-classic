@@ -559,6 +559,7 @@ void World::LoadConfigSettings(bool reload)
     setConfigMin(CONFIG_UINT32_MIN_HONOR_KILLS, "MinHonorKills", HONOR_STANDING_MIN_KILL, 1);
 
     setConfigMinMax(CONFIG_UINT32_MAINTENANCE_DAY, "MaintenanceDay", 4, 0, 6);
+    setConfigMinMax(CONFIG_UINT32_MAINTENANCE_HOUR, "MaintenanceHour", 0, 0, 23);
 
     setConfig(CONFIG_BOOL_ALWAYS_SHOW_QUEST_GREETING, "AlwaysShowQuestGreeting", false);
 
@@ -2209,6 +2210,14 @@ void World::InitServerMaintenanceCheck()
     else
     {
         m_NextMaintenanceDate = (*queryResult)[0].GetUInt64();
+
+        // a pending date that isn't the next configured maintenance day means MaintenanceDay changed; realign it
+        uint32 expectedDate = GetDateLastMaintenanceDay() + 7;
+        if (m_NextMaintenanceDate > GetDateToday() && m_NextMaintenanceDate != expectedDate)
+        {
+            m_NextMaintenanceDate = expectedDate;
+            CharacterDatabase.PExecute("UPDATE saved_variables SET NextMaintenanceDate = '" UI64FMTD "'", uint64(m_NextMaintenanceDate));
+        }
     }
 
     if (m_NextMaintenanceDate <= GetDateToday())

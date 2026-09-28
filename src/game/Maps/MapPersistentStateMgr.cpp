@@ -35,6 +35,7 @@
 
 #include <list>
 #include <cstdarg>
+#include <cmath>
 
 INSTANTIATE_SINGLETON_1(MapPersistentStateManager);
 
@@ -344,6 +345,23 @@ bool BattleGroundPersistentState::CanBeUnload() const
 
 //== DungeonResetScheduler functions ======================
 
+// global resets happen at Instance.ResetTimeHour server local time (not UTC), DST safe
+static time_t LocalDayHour(time_t t, uint32 hour, int32 days = 0)
+{
+    tm localTm = *localtime(&t);
+    localTm.tm_mday += days;
+    localTm.tm_hour = hour;
+    localTm.tm_min = 0;
+    localTm.tm_sec = 0;
+    localTm.tm_isdst = -1;
+    return mktime(&localTm);
+}
+
+static int32 LocalDaysBetween(time_t from, time_t to)
+{
+    return int32(std::floor(double(LocalDayHour(to, 12) - LocalDayHour(from, 12)) / DAY + 0.5));
+}
+
 uint32 DungeonResetScheduler::GetMaxResetTimeFor(InstanceTemplate const* temp)
 {
     if (!temp)
@@ -354,16 +372,15 @@ uint32 DungeonResetScheduler::GetMaxResetTimeFor(InstanceTemplate const* temp)
 
 time_t DungeonResetScheduler::CalculateNextResetTime(InstanceTemplate const* temp, time_t prevResetTime)
 {
-    uint32 diff = sWorld.getConfig(CONFIG_UINT32_INSTANCE_RESET_TIME_HOUR) * HOUR;
-    uint32 period = GetMaxResetTimeFor(temp);
-    return ((prevResetTime + MINUTE) / DAY * DAY) + period + diff;
+    uint32 resetHour = sWorld.getConfig(CONFIG_UINT32_INSTANCE_RESET_TIME_HOUR);
+    return LocalDayHour(prevResetTime + MINUTE, resetHour, temp->reset_delay);
 }
 
 void DungeonResetScheduler::LoadResetTimes()
 {
     time_t now = time(nullptr);
-    time_t today = (now / DAY) * DAY;
-    time_t nextWeek = today + (7 * DAY);
+    uint32 resetHour = sWorld.getConfig(CONFIG_UINT32_INSTANCE_RESET_TIME_HOUR);
+    time_t nextWeek = LocalDayHour(now, resetHour, 7);
 
     // NOTE: Use DirectPExecute for tables that will be queried later
 
@@ -424,7 +441,6 @@ void DungeonResetScheduler::LoadResetTimes()
     }
 
     // load the global respawn times for raid instances
-    uint32 diff = sWorld.getConfig(CONFIG_UINT32_INSTANCE_RESET_TIME_HOUR) * HOUR;
     m_resetTimeByMapId.resize(sMapStore.GetNumRows() + 1);
     queryResult = CharacterDatabase.Query("SELECT mapid, resettime FROM instance_reset");
     if (queryResult)
@@ -446,7 +462,7 @@ void DungeonResetScheduler::LoadResetTimes()
 
             // update the reset time if the hour in the configs changes
             uint64 oldresettime = fields[1].GetUInt64();
-            uint64 newresettime = (oldresettime / DAY) * DAY + diff;
+            uint64 newresettime = uint64(LocalDayHour(time_t(oldresettime), resetHour));
             if (oldresettime != newresettime)
                 CharacterDatabase.DirectPExecute("UPDATE instance_reset SET resettime = '" UI64FMTD "' WHERE mapid = '%u'", newresettime, mapid);
 
@@ -472,21 +488,22 @@ void DungeonResetScheduler::LoadResetTimes()
         if (!mapEntry || !mapEntry->IsDungeon())
             continue;
 
-        uint32 period = GetMaxResetTimeFor(temp);
+        int32 period = int32(temp->reset_delay);
         time_t t = GetResetTimeFor(temp->map);
         if (!t)
         {
             // initialize the reset time
-            t = today + period + diff;
+            t = LocalDayHour(now, resetHour, period);
             CharacterDatabase.DirectPExecute("INSERT INTO instance_reset VALUES ('%u','" UI64FMTD "')", temp->map, (uint64)t);
         }
 
         if (t < now || t > nextWeek)
         {
             // assume that expired instances have already been cleaned
-            // calculate the next reset time
-            t = (t / DAY) * DAY;
-            t += ((today - t) / period + 1) * period + diff;
+            // calculate the next reset time: the first one on the old schedule that is still ahead
+            t = LocalDayHour(t, resetHour, std::max(LocalDaysBetween(t, now) / period, 0) * period);
+            if (t <= now)
+                t = LocalDayHour(t, resetHour, period);
             CharacterDatabase.DirectPExecute("UPDATE instance_reset SET resettime = '" UI64FMTD "' WHERE mapid = '%u'", (uint64)t, temp->map);
         }
 

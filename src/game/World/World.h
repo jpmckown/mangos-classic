@@ -185,6 +185,7 @@ enum eConfigUInt32Values
     CONFIG_UINT32_INTERACTION_PAUSE_TIMER,
     CONFIG_UINT32_MIN_LEVEL_STAT_SAVE,
     CONFIG_UINT32_MAINTENANCE_DAY,
+    CONFIG_UINT32_MAINTENANCE_HOUR,
     CONFIG_UINT32_CHARDELETE_KEEP_DAYS,
     CONFIG_UINT32_CHARDELETE_METHOD,
     CONFIG_UINT32_CHARDELETE_MIN_LEVEL,
@@ -456,13 +457,15 @@ class World
 
         tm* GetLocalTimeByTime(time_t now) const { return localtime(&now); }
         uint32 GetDateByLocalTime(tm* now) const { return ((uint32)(now->tm_year << 16) | (uint32)(now->tm_yday)); }
-        uint32 GetDateToday() const {   return GetDateByLocalTime(GetLocalTimeByTime(m_gameTime)); }
-        uint32 GetDateThisWeekBegin() const {   return GetDateToday() - GetLocalTimeByTime(m_gameTime)->tm_wday; }
+        // honor days (and so honor weeks) roll over at MaintenanceHour local time instead of midnight
+        time_t GetHonorTime() const { return m_gameTime - time_t(getConfig(CONFIG_UINT32_MAINTENANCE_HOUR) * HOUR); }
+        uint32 GetDateToday() const {   return GetDateByLocalTime(GetLocalTimeByTime(GetHonorTime())); }
+        uint32 GetDateThisWeekBegin() const {   return GetDateToday() - GetLocalTimeByTime(GetHonorTime())->tm_wday; }
         uint32 GetDateLastMaintenanceDay() const
         {
             uint32 today = GetDateToday();
             uint32 mDay  = getConfig(CONFIG_UINT32_MAINTENANCE_DAY);
-            tm* date     = GetLocalTimeByTime(m_gameTime);
+            tm* date     = GetLocalTimeByTime(GetHonorTime());
             // formula to find last mDay of gregorian calendary
             return today - ((date->tm_wday - mDay  + 7) % 7);
         }
