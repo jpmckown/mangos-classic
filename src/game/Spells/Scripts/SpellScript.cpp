@@ -22,6 +22,7 @@
 std::map<uint32, SpellScript*> SpellScriptMgr::m_spellScriptMap {};
 std::map<uint32, AuraScript*> SpellScriptMgr::m_auraScriptMap {};
 std::map<uint32, UnitScript*> SpellScriptMgr::m_unitScriptMap {};
+std::vector<UnitScript*> SpellScriptMgr::m_unitScripts {};
 
 std::map<std::string, std::unique_ptr<SpellScript>> SpellScriptMgr::m_spellScriptStringMap {};
 std::map<std::string, std::unique_ptr<AuraScript>> SpellScriptMgr::m_auraScriptStringMap {};
@@ -140,14 +141,6 @@ UnitScript* SpellScriptMgr::GetUnitScript(std::string scriptName) {
     return nullptr;
 }
 
-std::vector<UnitScript*> SpellScriptMgr::GetUnitScripts() {
-    std::vector<UnitScript*> scripts;
-    for (const auto& pair: m_unitScriptMap) {
-        scripts.push_back(pair.second);
-    }
-    return scripts;
-}
-
 void SpellScriptMgr::SetSpellScript(uint32 spellId, SpellScript* script)
 {
     m_spellScriptMap.emplace(spellId, script);
@@ -160,5 +153,6 @@ void SpellScriptMgr::SetAuraScript(uint32 spellId, AuraScript* script)
 
 void SpellScriptMgr::SetUnitScript(uint32 spellId, UnitScript* script)
 {
-    m_unitScriptMap.emplace(spellId, script);
+    if (m_unitScriptMap.emplace(spellId, script).second)
+        m_unitScripts.push_back(script);
 }

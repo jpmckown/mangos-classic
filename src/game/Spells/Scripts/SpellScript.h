@@ -156,7 +156,7 @@ class SpellScriptMgr
         static SpellScript* GetSpellScript(uint32 spellId);
         static AuraScript* GetAuraScript(uint32 spellId);
         static UnitScript* GetUnitScript(uint32 spellId);
-        static std::vector<UnitScript*> GetUnitScripts();
+        static std::vector<UnitScript*> const& GetUnitScripts() { return m_unitScripts; }
 
         static void SetSpellScript(std::string scriptName, SpellScript* script);
         static void SetAuraScript(std::string scriptName, AuraScript* script);
@@ -175,6 +175,7 @@ class SpellScriptMgr
         static std::map<uint32, SpellScript*> m_spellScriptMap;
         static std::map<uint32, AuraScript*> m_auraScriptMap;
         static std::map<uint32, UnitScript*> m_unitScriptMap;
+        static std::vector<UnitScript*> m_unitScripts; // flat copy of m_unitScriptMap values for the DealDamage hot path
         static std::map<std::string, std::unique_ptr<SpellScript>> m_spellScriptStringMap;
         static std::map<std::string, std::unique_ptr<AuraScript>> m_auraScriptStringMap;
         static std::map<std::string, std::unique_ptr<UnitScript>> m_unitScriptStringMap;
