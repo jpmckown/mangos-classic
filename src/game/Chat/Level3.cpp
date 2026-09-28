@@ -1748,6 +1748,179 @@ bool ChatHandler::HandleAddItemSetCommand(char* args)
     return true;
 }
 
+// Profession spells (per SkillLineAbility) that create itemId, in spell id order
+static std::vector<uint32> GetRecipeSpellsCreatingItem(uint32 itemId)
+{
+    std::vector<uint32> recipes;
+    for (uint32 id = 1; id < sSpellTemplate.GetMaxEntry(); ++id)
+    {
+        SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(id);
+        if (!spellInfo)
+            continue;
+
+        bool createsItem = false;
+        for (uint32 i = 0; i < MAX_EFFECT_INDEX; ++i)
+            if (spellInfo->Effect[i] == SPELL_EFFECT_CREATE_ITEM && spellInfo->EffectItemType[i] == itemId)
+                createsItem = true;
+
+        if (!createsItem)
+            continue;
+
+        SkillLineAbilityMapBounds bounds = sSpellMgr.GetSkillLineAbilityMapBoundsBySpellId(id);
+        for (SkillLineAbilityMap::const_iterator itr = bounds.first; itr != bounds.second; ++itr)
+        {
+            if (IsProfessionSkill(itr->second->skillId))
+            {
+                recipes.push_back(id);
+                break;
+            }
+        }
+    }
+    return recipes;
+}
+
+bool ChatHandler::HandleAddRecipeCommand(char* args)
+{
+    Player* pl = m_session->GetPlayer();
+    Player* plTarget = getSelectedPlayer();
+    if (!plTarget)
+        plTarget = pl;
+
+    // spell id, recipe link (|Henchant from the craft window) or crafted item link (|Hitem from the tradeskill window)
+    uint32 spellId = ExtractSpellIdFromLink(&args);
+    if (!spellId)
+    {
+        uint32 itemId;
+        if (!ExtractUint32KeyFromLink(&args, "Hitem", itemId))
+            return false;
+
+        std::vector<uint32> recipes = GetRecipeSpellsCreatingItem(itemId);
+        if (recipes.empty())
+        {
+            PSendSysMessage("No profession recipe creates item %u.", itemId);
+            SetSentErrorMessage(true);
+            return false;
+        }
+
+        auto known = std::find_if(recipes.begin(), recipes.end(), [plTarget](uint32 id) { return plTarget->HasSpell(id); });
+        spellId = known != recipes.end() ? *known : recipes.front();
+
+        if (recipes.size() > 1)
+        {
+            int loc = GetSessionDbcLocale();
+            PSendSysMessage("Item %u is created by %u recipes, using %u. Pass a spell id to pick another:", itemId, uint32(recipes.size()), spellId);
+            for (uint32 id : recipes)
+                PSendSysMessage("  %u - %s%s", id, sSpellTemplate.LookupEntry<SpellEntry>(id)->SpellName[loc], plTarget->HasSpell(id) ? " (known)" : "");
+        }
+    }
+
+    uint32 craftCount = 1;
+    if (*args)
+    {
+        if (!ExtractUInt32(&args, craftCount))
+            return false;
+    }
+
+    if (craftCount < 1 || craftCount > 50)
+    {
+        PSendSysMessage("Craft count must be between 1 and 50.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spellId);
+    if (!spellInfo)
+    {
+        PSendSysMessage("Spell %u not found.", spellId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    DETAIL_LOG("addrecipe %u x%u", spellId, craftCount);
+
+    // Pre-check inventory space for all reagents
+    for (uint32 i = 0; i < MAX_SPELL_REAGENTS; ++i)
+    {
+        if (spellInfo->Reagent[i] <= 0)
+            continue;
+
+        uint32 itemId = spellInfo->Reagent[i];
+        uint32 singleCount = spellInfo->ReagentCount[i];
+        if (singleCount == 0)
+            continue;
+
+        uint32 totalNeeded = singleCount * craftCount;
+
+        ItemPrototype const* pProto = ObjectMgr::GetItemPrototype(itemId);
+        if (!pProto)
+        {
+            PSendSysMessage("Recipe %u reagent item %u not found.", spellId, itemId);
+            SetSentErrorMessage(true);
+            return false;
+        }
+
+        uint32 noSpaceForCount = 0;
+        ItemPosCountVec dest;
+        InventoryResult msg = plTarget->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemId, totalNeeded, &noSpaceForCount);
+        if (msg != EQUIP_ERR_OK || noSpaceForCount > 0)
+        {
+            PSendSysMessage("Insufficient inventory space for recipe %u. Need %u of item %u, but only %u can fit.",
+                            spellId, totalNeeded, itemId, totalNeeded - noSpaceForCount);
+            SetSentErrorMessage(true);
+            return false;
+        }
+    }
+
+    // All checks passed, now add the items
+    bool addedAny = false;
+    for (uint32 i = 0; i < MAX_SPELL_REAGENTS; ++i)
+    {
+        if (spellInfo->Reagent[i] <= 0)
+            continue;
+
+        uint32 itemId = spellInfo->Reagent[i];
+        uint32 singleCount = spellInfo->ReagentCount[i];
+        if (singleCount == 0)
+            continue;
+
+        uint32 totalNeeded = singleCount * craftCount;
+
+        ItemPrototype const* pProto = ObjectMgr::GetItemPrototype(itemId);
+        if (!pProto)
+            continue;
+
+        ItemPosCountVec dest;
+        InventoryResult msg = plTarget->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemId, totalNeeded);
+        if (msg != EQUIP_ERR_OK || dest.empty())
+            continue;
+
+        Item* item = plTarget->StoreNewItem(dest, itemId, true, Item::GenerateItemRandomPropertyId(itemId));
+        if (!item)
+            continue;
+
+        // remove binding for GM target
+        if (pl == plTarget)
+            for (ItemPosCountVec::const_iterator itr = dest.begin(); itr != dest.end(); ++itr)
+                if (Item* item1 = pl->GetItemByPos(itr->pos))
+                    item1->SetBinding(false);
+
+        pl->SendNewItem(item, totalNeeded, false, true);
+        if (pl != plTarget)
+            plTarget->SendNewItem(item, totalNeeded, true, false);
+
+        addedAny = true;
+    }
+
+    if (!addedAny)
+    {
+        PSendSysMessage("Recipe %u did not add any reagents.", spellId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    return true;
+}
+
 bool ChatHandler::HandleListItemCommand(char* args)
 {
     uint32 item_id;

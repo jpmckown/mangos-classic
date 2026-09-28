@@ -721,6 +721,7 @@ class ChatHandler
         bool HandleHideAreaCommand(char* args);
         bool HandleAddItemCommand(char* args);
         bool HandleAddItemSetCommand(char* args);
+        bool HandleAddRecipeCommand(char* args);
 
         bool HandleBankCommand(char* args);
         bool HandleChangeWeatherCommand(char* args);

@@ -987,6 +987,9 @@ ChatCommand* ChatHandler::getCommandTable()
         { "hidearea",       SEC_ADMINISTRATOR,  false, &ChatHandler::HandleHideAreaCommand,            "", nullptr },
         { "additem",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleAddItemCommand,             "", nullptr },
         { "additemset",     SEC_ADMINISTRATOR,  false, &ChatHandler::HandleAddItemSetCommand,          "", nullptr },
+        { "addrecipe",      SEC_ADMINISTRATOR,  false, &ChatHandler::HandleAddRecipeCommand,           "Syntax: .addrecipe #spellid/#shift-click-recipe-link/#shift-click-item-link [#count]\r\n\r\n"
+                                                                                                        "Adds the reagents for #count (1-50, default 1) crafts of the recipe to your or the selected character's inventory. "
+                                                                                                        "An item link (shift-click in a tradeskill window) uses the first recipe the character knows that creates the item.", nullptr },
         { "bank",           SEC_ADMINISTRATOR,  false, &ChatHandler::HandleBankCommand,                "", nullptr },
         { "wchange",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleChangeWeatherCommand,       "", nullptr },
         { "testing",        SEC_GAMEMASTER,     false, nullptr,                                        "", testingCommandTable },

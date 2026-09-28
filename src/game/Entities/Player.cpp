@@ -19284,7 +19284,10 @@ Item* Player::ConvertItem(Item* item, uint32 newItemId)
 uint32 Player::CalculateTalentsPoints() const
 {
     uint32 talentPointsForLevel = GetLevel() < 10 ? 0 : GetLevel() - 9;
-    return uint32(talentPointsForLevel * sWorld.getConfig(CONFIG_FLOAT_RATE_TALENT));
+    float rate = sWorld.getConfig(CONFIG_FLOAT_RATE_TALENT);
+    if (GetSession()->GetSecurity() == SEC_ADMINISTRATOR)
+        rate *= 3.0f;
+    return uint32(talentPointsForLevel * rate);
 }
 
 struct DoPlayerLearnSpell
