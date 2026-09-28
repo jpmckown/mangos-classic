@@ -28,6 +28,8 @@
 #include <iostream>
 #include <thread>
 #include <cstdarg>
+#include <chrono>
+#include <filesystem>
 
 #include <boost/stacktrace.hpp>
 
@@ -230,6 +232,9 @@ void Log::Initialize()
 
     m_logsTimestamp = "_" + GetTimestampStr();
 
+    // if set, a log left over from the previous run is moved there instead of being truncated or appended to
+    m_logsArchiveDir = sConfig.GetStringDefault("LogArchiveDir");
+
     /// Open specific log files
     logfile = openLogFile("LogFile", "LogTimestamp", "w");
 
@@ -304,7 +309,27 @@ FILE* Log::openLogFile(char const* configFileName, char const* configTimeStampFl
             logfn += m_logsTimestamp;
     }
 
-    return fopen((m_logsDir + logfn).c_str(), mode);
+    std::string path = m_logsDir + logfn;
+    if (!m_logsArchiveDir.empty())
+    {
+        // archive as <archive dir>/Name_<last write time>.ext, the archive dir being relative to LogsDir
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        if (fs::is_regular_file(path, ec) && fs::file_size(path, ec) > 0)
+        {
+            fs::path archiveDir = fs::path(m_logsDir.empty() ? "." : m_logsDir) / m_logsArchiveDir;
+            auto writeTime = std::chrono::clock_cast<std::chrono::system_clock>(fs::last_write_time(path, ec));
+            time_t lastWrite = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(writeTime));
+            fs::path src(path);
+            fs::path dst = archiveDir / (src.stem().string() + "_" + GetTimestampStr(lastWrite) + src.extension().string());
+            fs::create_directories(archiveDir, ec);
+            fs::rename(src, dst, ec);
+            if (ec)
+                fprintf(stderr, "Log: could not archive %s to %s: %s\n", path.c_str(), dst.string().c_str(), ec.message().c_str());
+        }
+    }
+
+    return fopen(path.c_str(), mode);
 }
 
 FILE* Log::openGmlogPerAccount(uint32 account)
@@ -345,7 +370,11 @@ void Log::outTime() const
 
 std::string Log::GetTimestampStr()
 {
-    time_t t = time(nullptr);
+    return GetTimestampStr(time(nullptr));
+}
+
+std::string Log::GetTimestampStr(time_t t)
+{
     tm* aTm = localtime(&t);
     //       YYYY   year
     //       MM     month (2 digits 01-12)

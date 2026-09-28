@@ -180,6 +180,7 @@ class Log : public MaNGOS::Singleton<Log, MaNGOS::ClassLevelLockable<Log, std::m
         void outTime() const;
         static void outTimestamp(FILE* file);
         static std::string GetTimestampStr();
+        static std::string GetTimestampStr(time_t t);
         bool HasLogFilter(uint32 filter) const { return (m_logFilter & filter) != 0; }
         void SetLogFilter(LogFilters filter, bool on) { if (on) m_logFilter |= filter; else m_logFilter &= ~filter; }
         bool HasLogLevelOrHigher(LogLevel loglvl) const { return m_logLevel >= loglvl || (m_logFileLevel >= loglvl && logfile); }
@@ -222,6 +223,7 @@ class Log : public MaNGOS::Singleton<Log, MaNGOS::ClassLevelLockable<Log, std::m
         // cache values for after initilization use (like gm log per account case)
         std::string m_logsDir;
         std::string m_logsTimestamp;
+        std::string m_logsArchiveDir;
 
         // char log control
         bool m_charLog_Dump;

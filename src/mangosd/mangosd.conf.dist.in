@@ -308,6 +308,11 @@ MaxWhoListReturns = 49
 #        Default: "Server.log"
 #                 "" - Empty name disable creating log file
 #
+#    LogArchiveDir
+#        At startup, move each non-empty log left over from the previous run into this directory
+#        (relative to LogsDir, created if missing) as Logname_YYYY-MM-DD_HH-MM-SS.Ext, stamped with its last write time
+#        Default: "" - disabled (the main log is truncated, the others are appended to)
+#
 #    PacketLogFile
 #        Description: Binary packet logging file for the world server.
 #                     Filename extension must be .pkt to be parsable with WPP.
@@ -419,6 +424,7 @@ PidFile = ""
 LogLevel = 1
 LogTime = 0
 LogFile = "Server.log"
+LogArchiveDir = ""
 PacketLogFile = ""
 LogTimestamp = 0
 LogFileLevel = 0

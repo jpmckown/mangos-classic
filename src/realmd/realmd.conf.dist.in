@@ -68,6 +68,11 @@ ConfVersion=2021031501
 #        Default: "Realmd.log"
 #                 "" - empty name disable creating log file
 #
+#    LogArchiveDir
+#        At startup, move each non-empty log left over from the previous run into this directory
+#        (relative to LogsDir, created if missing) as Logname_YYYY-MM-DD_HH-MM-SS.Ext, stamped with its last write time
+#        Default: "" - disabled (the main log is truncated, the others are appended to)
+#
 #    LogTimestamp
 #        Logfile with timestamp of server start in name
 #        Default: 0 - no timestamp in name
@@ -136,6 +141,7 @@ PidFile = ""
 LogLevel = 0
 LogTime = 0
 LogFile = "Realmd.log"
+LogArchiveDir = ""
 LogTimestamp = 0
 LogFileLevel = 0
 LogColors = ""
