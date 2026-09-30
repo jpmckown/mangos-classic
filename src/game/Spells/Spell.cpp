@@ -5003,14 +5003,15 @@ SpellCastResult Spell::CheckCast(bool strict)
                 && m_spellInfo->Effect[2] == SPELL_EFFECT_NONE)
             {
                 bool dispelTarget = false;
-                uint32 mechanic = m_spellInfo->EffectMiscValue[0];
+                // custom: compare by mask so DISPEL_ALL (7, e.g. Restoration 23396) matches magic/curse/disease/poison
+                uint32 dispelMask = GetDispellMask(DispelType(m_spellInfo->EffectMiscValue[0]));
                 SpellEntry const* spell = nullptr;
 
                 Unit::SpellAuraHolderMap& Auras = target->GetSpellAuraHolderMap();
                 for (Unit::SpellAuraHolderMap::iterator iter = Auras.begin(); iter != Auras.end(); ++iter)
                 {
                     spell = iter->second->GetSpellProto();
-                    if (spell->Dispel == mechanic)
+                    if ((1 << spell->Dispel) & dispelMask)
                     {
                         dispelTarget = true;
                         break;
