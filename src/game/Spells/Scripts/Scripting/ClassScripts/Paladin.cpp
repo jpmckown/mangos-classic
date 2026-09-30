@@ -162,6 +162,134 @@ struct JudgementOfCommand : public SpellScript
     }
 };
 
+// 20091, 20092 - Improved Retribution Aura (custom): every 2 sec in combat, the paladin's own
+// Retribution Aura also deals its damage as Holy to all enemies within 8 yd (34131)
+struct ImprovedRetributionAura : public AuraScript
+{
+    void OnPeriodicTrigger(Aura* aura, PeriodicTriggerData& data) const override
+    {
+        data.spellInfo = nullptr; // cast below with the aura's damage as basepoints
+
+        Unit* target = aura->GetTarget();
+        if (!target->IsAlive() || !target->IsInCombat())
+            return;
+
+        for (Aura* shield : target->GetAurasByType(SPELL_AURA_DAMAGE_SHIELD))
+        {
+            if (shield->GetCasterGuid() != target->GetObjectGuid() || !shield->GetSpellProto()->IsFitToFamily(SPELLFAMILY_PALADIN, uint64(0x0000000000000008)))
+                continue;
+
+            int32 damage = shield->GetModifier()->m_amount; // already includes this talent's +25/50%
+            target->CastCustomSpell(nullptr, 34131, &damage, nullptr, nullptr, TRIGGERED_OLD_TRIGGERED);
+            return;
+        }
+    }
+};
+
+// 25780 - Righteous Fury: Improved Righteous Fury (custom, TBC) fills effect 2 with 2/4/6% damage taken reduction
+struct RighteousFury : public AuraScript
+{
+    int32 OnAuraValueCalculate(AuraCalcData& data, int32 value) const override
+    {
+        if (data.effIdx != EFFECT_INDEX_1 || !data.caster)
+            return value;
+
+        if (data.caster->HasAura(20470)) // Rank 3
+            return -6;
+        if (data.caster->HasAura(20469)) // Rank 2
+            return -4;
+        if (data.caster->HasAura(20468)) // Rank 1
+            return -2;
+        return 0;
+    }
+};
+
+// 633, 2800, 10310 - Lay on Hands: Improved Lay on Hands (custom) refunds 50/100% of the drained mana
+struct LayOnHands : public SpellScript
+{
+    void OnSuccessfulFinish(Spell* spell) const override
+    {
+        Unit* caster = spell->GetCaster();
+        uint32 pct = 0;
+        if (caster->HasAura(20235))      // Rank 2
+            pct = 100;
+        else if (caster->HasAura(20234)) // Rank 1
+            pct = 50;
+
+        if (uint32 refund = spell->GetPowerCost() * pct / 100)
+            caster->EnergizeBySpell(caster, spell->m_spellInfo, refund, POWER_MANA);
+    }
+};
+
+// 20224, 20225, 20330, 20331, 20332 - Improved Seal of Righteousness (custom): effect 2 procs one
+// Seal of Righteousness hit when Crusader Strike, Exorcism, Holy Shock, Holy Wrath or Hammer of Wrath hits
+struct ImprovedSealOfRighteousness : public AuraScript
+{
+    bool OnCheckProc(Aura* aura, ProcExecutionData& data) const override
+    {
+        if (aura->GetEffIndex() != EFFECT_INDEX_1 || !data.spellInfo)
+            return false;
+
+        switch (data.spellInfo->Id)
+        {
+            case 2537: case 8823: case 8824: case 10336: case 10337:        // Crusader Strike
+            case 879: case 5614: case 5615: case 10312: case 10313: case 10314: // Exorcism
+            case 25912: case 25911: case 25902:                            // Holy Shock (damage)
+            case 2812: case 10318:                                         // Holy Wrath
+            case 24275: case 24274: case 24239:                            // Hammer of Wrath
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    SpellAuraProcResult OnProc(Aura* aura, ProcExecutionData& data) const override
+    {
+        Unit* caster = aura->GetTarget();
+        for (Aura* seal : caster->GetAurasByType(SPELL_AURA_DUMMY))
+        {
+            if (seal->GetEffIndex() == EFFECT_INDEX_0 && seal->GetSpellProto()->IsFitToFamily(SPELLFAMILY_PALADIN, uint64(0x0000000008000000)))
+            {
+                caster->CastSealOfRighteousnessProc(seal, data.target);
+                break;
+            }
+        }
+        return SPELL_AURA_PROC_CANT_TRIGGER; // done here, skip the generic dummy handler
+    }
+};
+
+// 34132, 34133 - Sheath of Light (custom trained passive): effect 1 is Holy spell damage equal to
+// effect 2's percent (10/20) of attack power, recalculated on heartbeat as attack power changes
+struct SheathOfLight : public AuraScript
+{
+    static int32 Calculate(Unit* target, SpellEntry const* spellProto)
+    {
+        if (spellProto->Id == 34132 && target->HasAura(34133)) // rank 2 supersedes rank 1
+            return 0;
+        int32 pct = spellProto->CalculateSimpleValue(EFFECT_INDEX_1);
+        return int32(target->GetTotalAttackPowerValue(BASE_ATTACK) * pct / 100);
+    }
+
+    int32 OnAuraValueCalculate(AuraCalcData& data, int32 value) const override
+    {
+        if (data.effIdx != EFFECT_INDEX_0 || !data.target)
+            return value;
+        return Calculate(data.target, data.spellProto);
+    }
+
+    void OnHeartbeat(Aura* aura) const override
+    {
+        if (aura->GetEffIndex() != EFFECT_INDEX_0)
+            return;
+        int32 amount = Calculate(aura->GetTarget(), aura->GetSpellProto());
+        if (amount == aura->GetModifier()->m_amount)
+            return;
+        aura->ApplyModifier(false, true);
+        aura->GetModifier()->m_amount = amount;
+        aura->ApplyModifier(true, true);
+    }
+};
+
 void LoadPaladinScripts()
 {
     RegisterSpellScript<JudgementOfLightIntermediate>("spell_judgement_of_light_intermediate");
@@ -171,4 +299,9 @@ void LoadPaladinScripts()
     RegisterSpellScript<SealOfTheCrusader>("spell_seal_of_the_crusader");
     RegisterSpellScript<BlessingOfLight>("spell_blessing_of_light");
     RegisterSpellScript<JudgementOfCommand>("spell_judgement_of_command");
+    RegisterSpellScript<ImprovedRetributionAura>("spell_paladin_improved_retribution_aura");
+    RegisterSpellScript<RighteousFury>("spell_paladin_righteous_fury");
+    RegisterSpellScript<LayOnHands>("spell_paladin_lay_on_hands");
+    RegisterSpellScript<ImprovedSealOfRighteousness>("spell_paladin_improved_seal_of_righteousness");
+    RegisterSpellScript<SheathOfLight>("spell_paladin_sheath_of_light");
 }

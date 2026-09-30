@@ -769,6 +769,75 @@ SpellAuraProcResult Unit::HandleHasteAuraProc(ProcExecutionData& data)
     return TriggerProccedSpell(target, basepoints, triggered_spell_id, castItem, triggeredByAura, cooldown, data.triggerOriginalCaster);
 }
 
+bool Unit::CastSealOfRighteousnessProc(Aura* seal, Unit* victim)
+{
+    if (GetTypeId() != TYPEID_PLAYER || !victim)
+        return false;
+
+    uint32 spellId;
+    switch (seal->GetId())
+    {
+        case 20154: spellId = 25742; break;     // Rank 1
+        case 21084: spellId = 25741; break;     // Rank 1.5
+        case 20287: spellId = 25740; break;     // Rank 2
+        case 20288: spellId = 25739; break;     // Rank 3
+        case 20289: spellId = 25738; break;     // Rank 4
+        case 20290: spellId = 25737; break;     // Rank 5
+        case 20291: spellId = 25736; break;     // Rank 6
+        case 20292: spellId = 25735; break;     // Rank 7
+        case 20293: spellId = 25713; break;     // Rank 8
+        default:
+            sLog.outError("Unit::CastSealOfRighteousnessProc: non handled possibly SoR (Id = %u)", seal->GetId());
+            return false;
+    }
+    SpellEntry const* sealSpell = seal->GetSpellProto();
+    int32 triggerAmount = seal->GetModifier()->m_amount;
+
+    Item* item = ((Player*)this)->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND);
+    float speed = (item ? item->GetProto()->Delay : BASE_ATTACK_TIME) / 1000.0f;
+
+    float damageBasePoints;
+    float coeff;
+    if (item && item->GetProto()->InventoryType == INVTYPE_2HWEAPON)
+    {
+        // two hand weapon
+        damageBasePoints = 1.20f * triggerAmount * 1.2f * 1.03f * speed / 100.0f + 1;
+        coeff = .108f * speed;
+    }
+    else
+    {
+        // one hand weapon/no weapon
+        damageBasePoints = 0.85f * ceil(triggerAmount * 1.2f * 1.03f * speed / 100.0f) - 1;
+        coeff = .092f * speed;
+    }
+
+    int32 damagePoint = int32(damageBasePoints + 0.03f * (GetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE) + GetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE)) / 2.0f) + 1;
+
+    // apply damage bonuses manually
+    if (damagePoint >= 0)
+    {
+        // currently uses same spell damage fetch as flametongue - need to verify whether SP is supposed to be applied pre-triggered spell bonuses or post
+        int32 bonusDamage = SpellBaseDamageBonusDone(GetSpellSchoolMask(sealSpell)) + victim->SpellBaseDamageBonusTaken(GetSpellSchoolMask(sealSpell));
+        if (Aura* aura = GetAura(43743, EFFECT_INDEX_0)) // Improved Seal of Righteousness
+            bonusDamage += aura->GetAmount();
+        damagePoint += bonusDamage * coeff * CalculateLevelPenalty(sealSpell);
+    }
+
+    // custom: Improved Seal of Righteousness talent (20224, 20225, 20330-20332) increases seal damage by 3-15%
+    // (its spell mod only reaches Judgement of Righteousness, the 1.12 seal lost the family bit)
+    for (uint32 talentId : { 20332, 20331, 20330, 20225, 20224 })
+    {
+        if (Aura* talent = GetAura(talentId, EFFECT_INDEX_0))
+        {
+            damagePoint += damagePoint * talent->GetModifier()->m_amount / 100;
+            break;
+        }
+    }
+
+    CastCustomSpell(victim, spellId, &damagePoint, nullptr, nullptr, TRIGGERED_OLD_TRIGGERED, nullptr, seal);
+    return true;
+}
+
 SpellAuraProcResult Unit::HandleDummyAuraProc(ProcExecutionData& data)
 {
     Unit* pVictim = data.target; uint32 damage = data.damage; Aura* triggeredByAura = data.triggeredByAura; SpellEntry const* spellInfo = data.spellInfo; uint32 procFlags = data.procFlags; uint32 procEx = data.procExtra; uint32 cooldown = data.cooldown;
@@ -795,8 +864,8 @@ SpellAuraProcResult Unit::HandleDummyAuraProc(ProcExecutionData& data)
                 case 9799:
                 case 25988:
                 {
-                    // prevent damage back from weapon special attacks
-                    if (!spellInfo || spellInfo->DmgClass != SPELL_DAMAGE_CLASS_MAGIC)
+                    // custom: all criticals reflect (melee, ranged and spell); only skip Eye for an Eye's own damage
+                    if (spellInfo && spellInfo->Id == 25997)
                         return SPELL_AURA_PROC_FAILED;
 
                     // return absorb included damage % to attacker but < 50% own total health
@@ -1094,56 +1163,8 @@ SpellAuraProcResult Unit::HandleDummyAuraProc(ProcExecutionData& data)
             // Seal of Righteousness - melee proc dummy
             if ((dummySpell->SpellFamilyFlags & uint64(0x000000008000000)) && triggeredByAura->GetEffIndex() == EFFECT_INDEX_0)
             {
-                if (GetTypeId() != TYPEID_PLAYER)
+                if (!CastSealOfRighteousnessProc(triggeredByAura, pVictim))
                     return SPELL_AURA_PROC_FAILED;
-
-                uint32 spellId;
-                switch (triggeredByAura->GetId())
-                {
-                    case 20154: spellId = 25742; break;     // Rank 1
-                    case 21084: spellId = 25741; break;     // Rank 1.5
-                    case 20287: spellId = 25740; break;     // Rank 2
-                    case 20288: spellId = 25739; break;     // Rank 3
-                    case 20289: spellId = 25738; break;     // Rank 4
-                    case 20290: spellId = 25737; break;     // Rank 5
-                    case 20291: spellId = 25736; break;     // Rank 6
-                    case 20292: spellId = 25735; break;     // Rank 7
-                    case 20293: spellId = 25713; break;     // Rank 8
-                    default:
-                        sLog.outError("Unit::HandleDummyAuraProc: non handled possibly SoR (Id = %u)", triggeredByAura->GetId());
-                        return SPELL_AURA_PROC_FAILED;
-                }
-                Item* item = ((Player*)this)->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND);
-                float speed = (item ? item->GetProto()->Delay : BASE_ATTACK_TIME) / 1000.0f;
-
-                float damageBasePoints;
-                float coeff;
-                if (item && item->GetProto()->InventoryType == INVTYPE_2HWEAPON)
-                {
-                    // two hand weapon
-                    damageBasePoints = 1.20f * triggerAmount * 1.2f * 1.03f * speed / 100.0f + 1;
-                    coeff = .108f * speed;
-                }
-                else
-                {
-                    // one hand weapon/no weapon
-                    damageBasePoints = 0.85f * ceil(triggerAmount * 1.2f * 1.03f * speed / 100.0f) - 1;
-                    coeff = .092f * speed;
-                }
-
-                int32 damagePoint = int32(damageBasePoints + 0.03f * (GetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE) + GetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE)) / 2.0f) + 1;
-
-                // apply damage bonuses manually
-                if (damagePoint >= 0)
-                {
-                    // currently uses same spell damage fetch as flametongue - need to verify whether SP is supposed to be applied pre-triggered spell bonuses or post
-                    int32 bonusDamage = SpellBaseDamageBonusDone(GetSpellSchoolMask(dummySpell)) + pVictim->SpellBaseDamageBonusTaken(GetSpellSchoolMask(dummySpell));
-                    if (Aura* aura = GetAura(43743, EFFECT_INDEX_0)) // Improved Seal of Righteousness
-                        bonusDamage += aura->GetAmount();
-                    damagePoint += bonusDamage * coeff * CalculateLevelPenalty(dummySpell);
-                }
-
-                CastCustomSpell(pVictim, spellId, &damagePoint, nullptr, nullptr, TRIGGERED_OLD_TRIGGERED, nullptr, triggeredByAura);
                 return SPELL_AURA_PROC_OK;                  // no hidden cooldown
             }
 
