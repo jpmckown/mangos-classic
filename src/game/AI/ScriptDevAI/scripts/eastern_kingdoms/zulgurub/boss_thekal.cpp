@@ -25,7 +25,11 @@ EndScriptData
 
 #include "AI/ScriptDevAI/include/sc_common.h"
 #include "zulgurub.h"
+#include "AI/ScriptDevAI/include/sc_solo_scaling.h"
 #include "AI//ScriptDevAI/base/CombatAI.h"
+
+// Fork: how long the others have to die after one fakes death: 60 s solo, down to the stock 10 s at 20 players
+inline uint32 GetThekalReviveWindow(Map const* map) { return uint32(ScaleByPlayerCount(map, 20, 60000.0f, 10000.0f)); }
 
 enum
 {
@@ -265,7 +269,7 @@ struct boss_thekalAI : public boss_thekalBaseAI
 
     void OnFakeingDeath() override
     {
-        ResetTimer(ACTION_RESSURECTION, 10000);
+        ResetTimer(ACTION_RESSURECTION, GetThekalReviveWindow(m_creature->GetMap()));
 
         if (m_instance)
         {
@@ -355,7 +359,7 @@ struct mob_zealot_lorkhanAI : public boss_thekalBaseAI
 
     void OnFakeingDeath() override
     {
-        ResetTimer(ACTION_RESSURECTION, 10000);
+        ResetTimer(ACTION_RESSURECTION, GetThekalReviveWindow(m_creature->GetMap()));
 
         if (m_instance)
             m_instance->SetData(TYPE_LORKHAN, SPECIAL);
@@ -404,7 +408,7 @@ struct mob_zealot_zathAI : public boss_thekalBaseAI
 
     void OnFakeingDeath() override
     {
-        ResetTimer(ACTION_RESSURECTION, 10000);
+        ResetTimer(ACTION_RESSURECTION, GetThekalReviveWindow(m_creature->GetMap()));
 
         if (m_instance)
             m_instance->SetData(TYPE_ZATH, SPECIAL);

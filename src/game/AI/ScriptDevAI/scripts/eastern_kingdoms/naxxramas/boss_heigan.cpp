@@ -26,6 +26,7 @@ EndScriptData */
 #include "AI/ScriptDevAI/include/sc_common.h"
 #include "AI/ScriptDevAI/base/BossAI.h"
 #include "naxxramas.h"
+#include "AI/ScriptDevAI/include/sc_solo_scaling.h"
 
 enum
 {
@@ -54,6 +55,7 @@ enum
     SPELL_TELEPORT_TRIGGER  = 29499,
 
     MAX_PLAYERS_TELEPORT    = 3,
+    TELEPORT_RAID_SIZE      = 40,               // fork: full raid gets every teleport
 
     NPC_PLAGUE_WAVE         = 17293,                // Control plague waves
     NPC_WORLD_TRIGGER       = 15384
@@ -300,7 +302,8 @@ struct TeleportTrigger : public SpellScript
     void OnEffectExecute(Spell* spell, SpellEffectIndex /*effIdx*/) const override
     {
         Unit* target = spell->GetUnitTarget();
-        if (target)
+        // Fork: fewer players, fewer teleports (solo: 1 in 3, so about every 2 min)
+        if (target && RollByPlayerCount(target->GetMap(), TELEPORT_RAID_SIZE, 1.0f / 3.0f))
             target->CastSpell(target, SPELL_TELEPORT_PLAYERS, TRIGGERED_OLD_TRIGGERED);
     }
 };

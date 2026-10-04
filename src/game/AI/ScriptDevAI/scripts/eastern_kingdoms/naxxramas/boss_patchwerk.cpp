@@ -26,6 +26,7 @@ EndScriptData
 #include "AI/ScriptDevAI/include/sc_common.h"
 #include "AI/ScriptDevAI/base/BossAI.h"
 #include "naxxramas.h"
+#include "AI/ScriptDevAI/include/sc_solo_scaling.h"
 
 enum
 {
@@ -134,8 +135,10 @@ struct HatefulStrikePrimer : public SpellScript
             if (Unit* caster = spell->GetCaster())
             {
                 // Target is filtered in Spell::FilterTargetMap
+                // Fork: fewer players, fewer strikes (solo: 1 in 25, so about every 30 s instead of every 1.2 s)
                 if (Unit* unitTarget = spell->GetUnitTarget())
-                    caster->CastSpell(unitTarget, SPELL_HATEFULSTRIKE, TRIGGERED_NONE);
+                    if (RollByPlayerCount(caster->GetMap(), 40, 1.0f / 25.0f))
+                        caster->CastSpell(unitTarget, SPELL_HATEFULSTRIKE, TRIGGERED_NONE);
             }
         }
     }

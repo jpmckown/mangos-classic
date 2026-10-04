@@ -27,6 +27,7 @@ EndScriptData
 #include "temple_of_ahnqiraj.h"
 #include "AI/ScriptDevAI/base/CombatAI.h"
 #include "Spells/Scripts/SpellScript.h"
+#include "AI/ScriptDevAI/include/sc_solo_scaling.h"
 
 enum
 {
@@ -106,7 +107,7 @@ struct npc_ouro_triggerAI : public ScriptedAI // needs to be before Ouro for com
 
 struct boss_ouroAI : public CombatAI
 {
-    boss_ouroAI(Creature* creature) : CombatAI(creature, OURO_ACTION_MAX), m_instance(static_cast<ScriptedInstance*>(creature->GetInstanceData())), m_firstMound(true)
+    boss_ouroAI(Creature* creature) : CombatAI(creature, OURO_ACTION_MAX), m_instance(static_cast<ScriptedInstance*>(creature->GetInstanceData())), m_firstMound(true), m_moundsLeft(5), m_berserk(false)
     {
         AddTimerlessCombatAction(OURO_ENRAGE, true);
         AddCombatAction(OURO_SPAWN, 300u);
@@ -123,6 +124,8 @@ struct boss_ouroAI : public CombatAI
     ScriptedInstance* m_instance;
     int32 m_rangeCheckState;
     bool m_firstMound;
+    uint32 m_moundsLeft;                                    // fork: mounds still allowed this submerge
+    bool m_berserk;
     uint32 m_burrowCounter;
     ObjectGuid m_base;
 
@@ -173,6 +176,15 @@ struct boss_ouroAI : public CombatAI
         switch (summoned->GetEntry())
         {
             case NPC_DIRT_MOUND:
+                // Fork: fewer mounds with fewer players. Submerge: 1 solo up to the stock 5 at 40
+                // (the first always stays, it brings Ouro back up). Berserk: each periodic mound 1 in 5 solo.
+                if (!m_firstMound && !(m_berserk ? RollByPlayerCount(m_creature->GetMap(), 40, 0.2f) : m_moundsLeft > 0))
+                {
+                    summoned->ForcedDespawn();
+                    break;
+                }
+                if (m_moundsLeft)
+                    --m_moundsLeft;
                 if (m_firstMound)
                     summoned->CastSpell(nullptr, SPELL_SUMMON_OURO_TRIGG, TRIGGERED_OLD_TRIGGERED);
                 else
@@ -194,6 +206,7 @@ struct boss_ouroAI : public CombatAI
         {
             SetCombatScriptStatus(true);
             SetMeleeEnabled(false);
+            m_moundsLeft = uint32(ScaleByPlayerCount(m_creature->GetMap(), 40, 1.0f, 5.0f) + 0.5f);
             DoCastSpellIfCan(nullptr, SPELL_SUMMON_OURO_MOUNDS, CAST_TRIGGERED);
             DoCastSpellIfCan(nullptr, SPELL_SUMMON_TRIGGER, CAST_TRIGGERED);
 
@@ -249,6 +262,7 @@ struct boss_ouroAI : public CombatAI
                     if (DoCastSpellIfCan(nullptr, SPELL_BERSERK) == CAST_OK)
                     {
                         m_firstMound = false; // in order to avoid spawning more ouros
+                        m_berserk = true;
                         ResetCombatAction(OURO_BOULDER, 500);
                         SetActionReadyStatus(action, false);
                         DisableCombatAction(OURO_SUBMERGE);

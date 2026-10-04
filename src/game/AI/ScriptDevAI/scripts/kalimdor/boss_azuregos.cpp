@@ -37,6 +37,9 @@ enum
     SPELL_FROST_BREATH          = 21099,
     SPELL_REFLECT               = 22067,
     SPELL_CLEAVE                = 19983,                    // Was 8255; this one is from wowhead and seems to be the correct one
+
+    // Fork: Azshara has no subzone for a zone blessing, so the encounter grants it (see InstanceLeech.cpp)
+    SPELL_ENCOUNTER_BLESSING    = 34145,
 };
 
 enum AzuregosActions
@@ -47,6 +50,7 @@ enum AzuregosActions
     AZUREGOS_TELEPORT,
     AZUREGOS_REFLECTMAGIC,
     AZUREGOS_CLEAVE,
+    AZUREGOS_ENCOUNTER_BLESSING,
     AZUREGOS_ACTION_MAX,
 };
 
@@ -60,6 +64,7 @@ struct boss_azuregosAI : public CombatAI
         AddCombatAction(AZUREGOS_TELEPORT, 30u * IN_MILLISECONDS);
         AddCombatAction(AZUREGOS_REFLECTMAGIC, 15u * IN_MILLISECONDS, 30u * IN_MILLISECONDS);
         AddCombatAction(AZUREGOS_CLEAVE, 7u * IN_MILLISECONDS);
+        AddCombatAction(AZUREGOS_ENCOUNTER_BLESSING, 0u);
     }
 
     void Reset() override
@@ -133,6 +138,13 @@ struct boss_azuregosAI : public CombatAI
             {
                 if (DoCastSpellIfCan(m_creature->GetVictim(), SPELL_CLEAVE) == CAST_OK)
                     ResetCombatAction(action, 7 * IN_MILLISECONDS);
+                break;
+            }
+            case AZUREGOS_ENCOUNTER_BLESSING:
+            {
+                // Pulse at once, then every 10 s; the 30 s auras it grants run out after the fight
+                if (DoCastSpellIfCan(nullptr, SPELL_ENCOUNTER_BLESSING, CAST_TRIGGERED) == CAST_OK)
+                    ResetCombatAction(action, 10 * IN_MILLISECONDS);
                 break;
             }
             default:

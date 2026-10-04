@@ -728,9 +728,21 @@ struct CheckReset : public SpellScript
         // If we have at least one target, do nothing
         if (Unit* target = spell->GetUnitTarget())
             return;
+        Unit* caster = spell->GetCaster();
+        if (!caster)
+            return;
+        // Fork: the stomach is ~200 yd below, outside the 100 yd check, so a solo player inside it
+        // would reset the fight. A living player in the stomach keeps the encounter going.
+        for (auto const& ref : caster->GetMap()->GetPlayers())
+        {
+            Player* player = ref.getSource();
+            if (!player || player->IsGameMaster() || !player->IsAlive())
+                continue;
+            if (player->HasAura(SPELL_DIGESTIVE_ACID) || (player->GetPositionZ() < 0.0f && caster->GetDistance2d(player->GetPositionX(), player->GetPositionY()) < 150.0f))
+                return;
+        }
         // Else: reset the encounter
-        if (Unit* caster = spell->GetCaster())
-            caster->CastSpell(nullptr, SPELL_RESET_ENCOUNTER, TRIGGERED_OLD_TRIGGERED);
+        caster->CastSpell(nullptr, SPELL_RESET_ENCOUNTER, TRIGGERED_OLD_TRIGGERED);
     }
 };
 

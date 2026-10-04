@@ -26,6 +26,8 @@ EndScriptData
 #include "AI/ScriptDevAI/include/sc_common.h"
 #include "ruins_of_ahnqiraj.h"
 #include "AI/ScriptDevAI/base/CombatAI.h"
+#include "AI/ScriptDevAI/include/sc_solo_scaling.h"
+#include "Spells/Scripts/SpellScript.h"
 #include "MotionGenerators/WaypointManager.h"
 #include <G3D/Vector3.h>
 
@@ -55,6 +57,10 @@ enum
     NPC_LARVA               = 15555,
     NPC_SWARMER             = 15546,
     NPC_HORNET              = 15934,
+
+    // Fork: solo scaling. Paralyze every 60 s solo down to 15 s at 20 players;
+    // the larva's Feed deals 25% of max HP solo up to an instakill at 20 players.
+    AYAMISS_RAID_SIZE       = 20,
 
     PHASE_AIR               = 0,
     PHASE_GROUND            = 1,
@@ -203,10 +209,8 @@ struct boss_ayamissAI : public CombatAI
         {
             case AYAMISS_FLY_UP:
             {
-                m_creature->SetLevitate(true);
-                m_creature->SetHover(true);
-                SetCombatScriptStatus(true);
-                m_creature->GetMotionMaster()->MovePoint(POINT_AIR, -9689.292f, 1547.912f, 48.02729f);
+                // Fork: no hover. Phase 1 stays on the ground at her spawn (still rooted, no melee of her own)
+                // so melee classes can reach her; phase 2 starts from there without the landing path.
                 SetActionReadyStatus(action, false);
                 break;
             }
@@ -220,8 +224,7 @@ struct boss_ayamissAI : public CombatAI
                     m_creature->SetLevitate(false);
                     m_creature->SetHover(false);
                     DoResetThreat();
-                    StartLanding();
-                    SetCombatScriptStatus(true);
+                    SetCombatMovement(true, true);      // fork: already on the ground, no landing path
                     SetActionReadyStatus(action, false);
 
                     DisableCombatAction(AYAMISS_POISON_STINGER);
@@ -251,7 +254,7 @@ struct boss_ayamissAI : public CombatAI
                 if (DoCastSpellIfCan(target, SPELL_PARALYZE) == CAST_OK)
                 {
                     m_paralyzeTarget = target->GetObjectGuid();
-                    ResetCombatAction(action, 15000);
+                    ResetCombatAction(action, uint32(ScaleByPlayerCount(m_creature->GetMap(), AYAMISS_RAID_SIZE, 60000.0f, 15000.0f)));
 
                     // Summon a larva
                     uint32 spellId = urand(0, 1) ? SPELL_SUMMON_LARVA_1 : SPELL_SUMMON_LARVA_2;
@@ -330,6 +333,14 @@ struct npc_hive_zara_larvaAI : public ScriptedAI
             {
                 if (m_creature->CanReachWithMeleeAttack(who) && who == m_creature->GetVictim())
                 {
+                    // Fork: below a full raid, Feed hits for a share of max HP instead of killing (see LarvaFeed)
+                    if (GetEncounterPlayerCount(m_creature->GetMap()) < AYAMISS_RAID_SIZE)
+                    {
+                        float fraction = ScaleByPlayerCount(m_creature->GetMap(), AYAMISS_RAID_SIZE, 0.25f, 1.0f);
+                        uint32 damage = std::min(uint32(who->GetMaxHealth() * fraction), who->GetHealth());
+                        Unit::SendSpellNonMeleeDamageLog(m_creature, who, SPELL_FEED, damage, SPELL_SCHOOL_MASK_NORMAL, 0, 0, false, 0);
+                        Unit::DealDamage(m_creature, who, damage, nullptr, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, nullptr, false);
+                    }
                     m_creature->CastSpell(who, SPELL_FEED, TRIGGERED_OLD_TRIGGERED, nullptr, nullptr, m_creature->GetObjectGuid());
                 }
                 return;
@@ -354,6 +365,19 @@ struct npc_hive_zara_larvaAI : public ScriptedAI
     }
 };
 
+// 25721 - Feed
+// Fork: effect 1 is an instakill on the fed player; drop the player from it below a full raid
+// (the larva already dealt scaled damage). The hornet summon and the larva's own death still happen.
+struct LarvaFeed : public SpellScript
+{
+    bool OnCheckTarget(const Spell* spell, Unit* target, SpellEffectIndex effIdx) const override
+    {
+        if (effIdx == EFFECT_INDEX_0 && target->GetTypeId() == TYPEID_PLAYER)
+            return GetEncounterPlayerCount(spell->GetCaster()->GetMap()) >= AYAMISS_RAID_SIZE;
+        return true;
+    }
+};
+
 void AddSC_boss_ayamiss()
 {
     Script* pNewScript = new Script;
@@ -365,4 +389,5 @@ void AddSC_boss_ayamiss()
     pNewScript->Name = "npc_hive_zara_larva";
     pNewScript->GetAI = &GetNewAIInstance<npc_hive_zara_larvaAI>;
     pNewScript->RegisterSelf();
+    RegisterSpellScript<LarvaFeed>("spell_ayamiss_larva_feed");
 }

@@ -50,6 +50,7 @@ enum
     // SPELL_SUMMON_PLAYER             = 24776,                // Not used in Classic
 
     NPC_YSONDRE                     = 14887,
+    NPC_DREAM_FOG                   = 15224,
 };
 
 struct boss_emerald_dragonAI : public ScriptedAI
@@ -88,6 +89,10 @@ struct boss_emerald_dragonAI : public ScriptedAI
     void JustSummoned(Creature* summoned) override
     {
         summoned->AI()->AttackClosestEnemy();
+        // Fork: Dream Fogs stay where they spawn (Dream Fog 24781 retargets them every 10 s; without
+        // movement they no longer chase a solo player into an unbreakable sleep chain)
+        if (summoned->GetEntry() == NPC_DREAM_FOG)
+            summoned->AI()->SetCombatMovement(false, true);
     }
 
     void JustDied(Unit* killer) override

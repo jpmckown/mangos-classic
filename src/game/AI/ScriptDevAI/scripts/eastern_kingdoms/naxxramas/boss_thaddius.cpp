@@ -30,6 +30,7 @@ EndContentData */
 #include "AI/ScriptDevAI/include/sc_common.h"
 #include "AI/ScriptDevAI/base/BossAI.h"
 #include "naxxramas.h"
+#include "AI/ScriptDevAI/include/sc_solo_scaling.h"
 
 enum
 {
@@ -275,7 +276,8 @@ struct boss_thaddiusAddsAI : public BossAI
         SetCombatScriptStatus(true);
 
         JustDied(attacker);                                  // Texts
-        ResetTimer(THADDIUS_ADD_REVIVE, 10s);
+        // Fork: kill window for the other add: 60 s solo, down to the stock 10 s at 40 players
+        ResetTimer(THADDIUS_ADD_REVIVE, uint32(ScaleByPlayerCount(m_creature->GetMap(), 40, 60000.0f, 10000.0f)));
     }
 };
 
@@ -458,6 +460,10 @@ struct ThaddiusCharge : public AuraScript
             for (Player* player : playerList)
                 if (target != player && player->HasAura(aura->GetId()))
                     ++curCount;
+
+            // Fork: stand in for the missing raid. A full 40 stacks about 19 same-charge players per side,
+            // so a solo player gets 19 extra stacks (+190%), shrinking to none at 40 players.
+            curCount += uint32(ScaleByPlayerCount(target->GetMap(), 40, 19.0f, 0.0f) + 0.5f);
 
             // Remove previous buffs in case we have less targets of the same charge near use than in previous tick
             target->RemoveAurasDueToSpell(buffAuraId);

@@ -27,6 +27,7 @@ EndScriptData
 #include "temple_of_ahnqiraj.h"
 #include "AI/ScriptDevAI/base/CombatAI.h"
 #include "Spells/Scripts/SpellScript.h"
+#include "AI/ScriptDevAI/include/sc_solo_scaling.h"
 
 enum
 {
@@ -83,7 +84,8 @@ enum
 
     MAX_VISCIDUS_GLOBS          = 20,                       // there are 20 summoned globs; each glob = 5% hp
 
-    // hitcounts
+    // hitcounts for a full 40-man raid; fork: scaled per pull by the player count (see SetHitCounts)
+    VISCIDUS_RAID_SIZE          = 40,
     HITCOUNT_SLOW               = 100,
     HITCOUNT_SLOW_MORE          = 150,
     HITCOUNT_FREEZE             = 200,
@@ -135,6 +137,7 @@ struct boss_viscidusAI : public CombatAI
     uint8 m_phase;
 
     uint32 m_hitCount;
+    uint32 m_hitSlow, m_hitSlowMore, m_hitFreeze, m_hitCrack, m_hitShatter, m_hitExplode;
 
     GuidList m_lGlobesGuidList;
     uint8 m_aliveGlobs;
@@ -147,6 +150,23 @@ struct boss_viscidusAI : public CombatAI
         m_aliveGlobs = 0;
 
         SetDeathPrevention(true);
+        SetHitCounts();
+    }
+
+    // Fork: the stock counts assume 40 players. Any hit now counts toward the freeze (no frost requirement,
+    // see ViscidusFrostWeakness), and the counts scale with the player count at the pull.
+    // Freeze stages: 100/150/200 * players/40 (solo 2/3/5), no time limit.
+    // Shatter: 3 hits per player inside the 15 s Freeze (solo 3), so a 3.8 s two-hander gets there on
+    // white swings alone; the stock 150 at 40 players.
+    void SetHitCounts()
+    {
+        uint32 players = std::min<uint32>(GetEncounterPlayerCount(m_creature->GetMap()), VISCIDUS_RAID_SIZE);
+        m_hitSlow = std::max<uint32>(1, HITCOUNT_SLOW * players / VISCIDUS_RAID_SIZE);
+        m_hitSlowMore = std::max<uint32>(m_hitSlow + 1, HITCOUNT_SLOW_MORE * players / VISCIDUS_RAID_SIZE);
+        m_hitFreeze = std::max<uint32>(m_hitSlowMore + 1, HITCOUNT_FREEZE * players / VISCIDUS_RAID_SIZE);
+        m_hitExplode = players >= VISCIDUS_RAID_SIZE ? uint32(HITCOUNT_EXPLODE) : std::max<uint32>(3, 3 * players);
+        m_hitCrack = std::max<uint32>(1, m_hitExplode / 3);
+        m_hitShatter = std::max<uint32>(m_hitCrack + 1, m_hitExplode * 2 / 3);
     }
 
     void Aggro(Unit* /*who*/) override
@@ -154,6 +174,7 @@ struct boss_viscidusAI : public CombatAI
         if (m_instance)
             m_instance->SetData(TYPE_VISCIDUS, IN_PROGRESS);
 
+        SetHitCounts();
         DoCastSpellIfCan(nullptr, SPELL_MEMBRANE_VISCIDUS, CAST_TRIGGERED | CAST_AURA_NOT_PRESENT);
         DoCastSpellIfCan(nullptr, SPELL_VISCIDUS_WEAKNESS, CAST_TRIGGERED | CAST_AURA_NOT_PRESENT);
     }
@@ -295,29 +316,29 @@ struct boss_viscidusAI : public CombatAI
         {
             case PHASE_NORMAL:
             {
-                if (m_hitCount == HITCOUNT_SLOW)
+                if (m_hitCount == m_hitSlow)
                     SetPhase(PHASE_SLOWED);
                 break;
             }
             case PHASE_SLOWED:
             {
-                if (m_hitCount == HITCOUNT_SLOW_MORE)
+                if (m_hitCount == m_hitSlowMore)
                     SetPhase(PHASE_SLOWED_MORE);
                 break;
             }
             case PHASE_SLOWED_MORE:
             {
-                if (m_hitCount == HITCOUNT_FREEZE)
+                if (m_hitCount == m_hitFreeze)
                     SetPhase(PHASE_FROZEN);
                 break;
             }
             case PHASE_FROZEN:
             {
-                if (m_hitCount == HITCOUNT_CRACK)
+                if (m_hitCount == m_hitCrack)
                     DoScriptText(EMOTE_CRACK, m_creature);
-                else if (m_hitCount == HITCOUNT_SHATTER)
+                else if (m_hitCount == m_hitShatter)
                     DoScriptText(EMOTE_SHATTER, m_creature);
-                else if (m_hitCount == HITCOUNT_EXPLODE)
+                else if (m_hitCount == m_hitExplode)
                     SetPhase(PHASE_EXPLODED);
                 break;
             }
@@ -546,15 +567,12 @@ struct ViscidusGrows : public SpellScript
 
 struct ViscidusFrostWeakness : public AuraScript
 {
-    SpellAuraProcResult OnProc(Aura* aura, ProcExecutionData& procData) const override
+    SpellAuraProcResult OnProc(Aura* aura, ProcExecutionData& /*procData*/) const override
     {
         if (Unit* target = aura->GetTarget())
         {
-            if (procData.spell)
-            {
-                if (procData.spell->GetSchoolMask() == SPELL_SCHOOL_MASK_FROST)
-                    target->AI()->SendAIEvent(AI_EVENT_CUSTOM_B, target, target);
-            }
+            // Fork: any hit counts (melee, ranged or spell), not only frost spells, so every class can freeze him
+            target->AI()->SendAIEvent(AI_EVENT_CUSTOM_B, target, target);
         }
         return SPELL_AURA_PROC_OK;
     }

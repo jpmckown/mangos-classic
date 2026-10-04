@@ -272,10 +272,8 @@ struct PossessRazorgore : public AuraScript
         {
             if (apply)
             {
-                if (Unit* caster = aura->GetCaster())
-                {
-                    caster->CastSpell(caster, SPELL_MIND_EXHAUSTION, TRIGGERED_OLD_TRIGGERED);
-                }
+                // Fork: no Mind Exhaustion, so a solo player can take the orb again right away
+                // (SpellEffects.cpp refuses the possess while 23958 is up)
                 aura->GetTarget()->CastSpell(nullptr, SPELL_DRAGON_ORB, TRIGGERED_OLD_TRIGGERED);
             }
             else

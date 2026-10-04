@@ -2,7 +2,13 @@
 
 enum LeechSpells
 {
-    SPELL_HEAL = 18984
+    SPELL_HEAL = 18984,
+
+    // Encounter-scoped blessing for outdoor bosses (no zone aura): 30 s copies of the 40-man blessing/regen,
+    // refreshed by the boss's pulse while in combat, so they fall off on their own after the fight.
+    SPELL_ZONE_BLESSING_40      = 34126,
+    SPELL_ENCOUNTER_BLESSING    = 34146,
+    SPELL_ENCOUNTER_REGEN       = 34147,
 };
 
 // One script instance is bound per tier aura (spell_scripts rows 34127-34130), and every bound
@@ -29,9 +35,23 @@ struct InstanceLeechOnDamageHealing : public UnitScript {
     }
 };
 
+// 34145 - Encounter Blessing (pulse cast by the boss on every enemy within 100 yd)
+struct EncounterBlessingPulse : public SpellScript {
+    void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override {
+        if (effIdx != EFFECT_INDEX_0) return;
+        Unit* target = spell->GetUnitTarget();
+        if (!target || target->GetTypeId() != TYPEID_PLAYER || !target->IsAlive()) return;
+        if (target->HasAura(SPELL_ZONE_BLESSING_40)) return; // never stack with a zone blessing
+        target->CastSpell(target, SPELL_ENCOUNTER_BLESSING, TRIGGERED_OLD_TRIGGERED);
+        target->CastSpell(target, SPELL_ENCOUNTER_REGEN, TRIGGERED_OLD_TRIGGERED);
+    }
+};
+
 void LoadInstanceScripts() {
     RegisterSpellScript<InstanceLeechOnDamageHealing<34127>>("spell_instance_heal");
     RegisterSpellScript<InstanceLeechOnDamageHealing<34128>>("spell_instance_heal_10");
     RegisterSpellScript<InstanceLeechOnDamageHealing<34129>>("spell_instance_heal_20");
     RegisterSpellScript<InstanceLeechOnDamageHealing<34130>>("spell_instance_heal_40");
+    RegisterSpellScript<InstanceLeechOnDamageHealing<SPELL_ENCOUNTER_REGEN>>("spell_instance_heal_40_encounter");
+    RegisterSpellScript<EncounterBlessingPulse>("spell_encounter_blessing");
 }
