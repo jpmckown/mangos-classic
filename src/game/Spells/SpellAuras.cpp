@@ -1562,6 +1562,8 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
         {
             switch (GetId())
             {
+                // custom: kept off - stacked with the TOTAL_PCT penalty in Paladin.cpp SealOfTheCrusader (as upstream does) it cut
+                // weapon damage to ~51%; the script's -28.6% alone keeps white damage per second neutral
                 // case 21082:                                 // Seal of the Crusader, rank 1
                 // case 20162:                                 // rank 2
                 // case 20305:                                 // rank 3

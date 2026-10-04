@@ -2048,7 +2048,7 @@ void Unit::CalculateMeleeDamage(Unit* pVictim, CalcDamageInfo* calcDamageInfo, W
             calcDamageInfo->HitInfo |= HITINFO_BLOCK;
             calcDamageInfo->TargetState = VICTIMSTATE_NORMAL;
             calcDamageInfo->procEx |= PROC_EX_BLOCK;
-            calcDamageInfo->blocked_amount = calcDamageInfo->target->GetShieldBlockValue();
+            calcDamageInfo->blocked_amount = calcDamageInfo->target->CalculateBlockedAmount(calcDamageInfo->totalDamage);
 
             if (calcDamageInfo->blocked_amount >= calcDamageInfo->totalDamage)
             {
@@ -2601,7 +2601,7 @@ void Unit::CalculateAbsorbResistBlock(Unit* caster, SpellNonMeleeDamage* spellDa
 {
     if (RollAbilityPartialBlockOutcome(caster, attType, spellInfo))
     {
-        spellDamageInfo->blocked = std::min(GetShieldBlockValue(), spellDamageInfo->damage);
+        spellDamageInfo->blocked = std::min(CalculateBlockedAmount(spellDamageInfo->damage), spellDamageInfo->damage);
         spellDamageInfo->damage -= spellDamageInfo->blocked;
     }
 
@@ -3321,7 +3321,30 @@ float Unit::CalculateEffectiveCrushChance(const Unit* victim, WeaponAttackType a
     const int32 deficit = (int32(GetWeaponSkillValue(attType, victim)) - int32(defense));
     if (deficit >= 15)
         chance += ((2 * deficit) - 15);
+    // custom: Anticipation - 3/6/9/12/15% lower chance to be crushed
+    chance -= victim->GetPaladinTalentDummyPercent(20096, 20100);
     return std::max(0.0f, std::min(chance, 100.0f));
+}
+
+int32 Unit::GetPaladinTalentDummyPercent(uint32 firstId, uint32 lastId) const
+{
+    if (GetTypeId() != TYPEID_PLAYER || getClass() != CLASS_PALADIN)
+        return 0;
+    int32 pct = 0;
+    for (Aura* aura : GetAurasByType(SPELL_AURA_DUMMY))
+        if (aura->GetId() >= firstId && aura->GetId() <= lastId && aura->GetEffIndex() == EFFECT_INDEX_1)
+            pct += aura->GetModifier()->m_amount;
+    return pct;
+}
+
+uint32 Unit::CalculateBlockedAmount(uint32 damage) const
+{
+    uint32 blocked = GetShieldBlockValue();
+    // custom: Shield Specialization - blocks also stop 10/20/30% of the damage left after block value
+    if (blocked < damage)
+        if (int32 pct = GetPaladinTalentDummyPercent(20148, 20150))
+            blocked += (damage - blocked) * pct / 100;
+    return blocked;
 }
 
 float Unit::CalculateEffectiveGlanceChance(const Unit* victim, WeaponAttackType attType) const
@@ -7061,14 +7084,19 @@ uint32 Unit::SpellDamageBonusDone(Unit* victim, SpellSchoolMask schoolMask, Spel
     if (GetTypeId() == TYPEID_UNIT && !((Creature*)this)->IsPet())
         DoneTotalMod *= Creature::_GetSpellDamageMod(((Creature*)this)->GetCreatureInfo()->Rank);
 
+    // custom: weapon-gated auras that also cover magic schools (One-Handed Weapon Specialization) apply while the main hand fits
+    Item* mainHand = GetTypeId() == TYPEID_PLAYER ? static_cast<Player*>(this)->GetWeaponForAttack(BASE_ATTACK, true, true) : nullptr;
     AuraList const& mModDamagePercentDone = GetAurasByType(SPELL_AURA_MOD_DAMAGE_PERCENT_DONE);
     for (auto i : mModDamagePercentDone)
     {
+        SpellEntry const* auraProto = i->GetSpellProto();
         if ((i->GetModifier()->m_miscvalue & schoolMask) &&
-            i->GetSpellProto()->EquippedItemClass == -1 &&
+            ((auraProto->EquippedItemClass == -1 &&
                 // -1 == any item class (not wand then)
-            i->GetSpellProto()->EquippedItemInventoryTypeMask == 0)
-            // 0 == any inventory type (not wand then)
+              auraProto->EquippedItemInventoryTypeMask == 0) ||
+                // 0 == any inventory type (not wand then)
+             (auraProto->EquippedItemClass == ITEM_CLASS_WEAPON && (i->GetModifier()->m_miscvalue & SPELL_SCHOOL_MASK_MAGIC) &&
+              mainHand && mainHand->IsFitToSpellRequirements(auraProto))))
         {
             DoneTotalMod *= (i->GetModifier()->m_amount + 100.0f) / 100.0f;
         }
@@ -7541,6 +7569,7 @@ uint32 Unit::MeleeDamageBonusDone(Unit* victim, uint32 pdamage, WeaponAttackType
                 continue;
             switch (i->GetSpellProto()->Id)
             {
+                // custom: kept off together with the base weapon DPS penalty in Aura::HandleAuraDummy (no spell_affect rows anyway)
                 // case 20162: // Seal of the Crusader - all ranks
                 // case 20305:
                 // case 20306:

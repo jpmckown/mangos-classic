@@ -1213,6 +1213,7 @@ class Unit : public WorldObject
         uint32 m_extraAttacks;
         ObjectGuid m_extraAttackGuid;
         void DoExtraAttacks(Unit* victim);
+        bool IsExecutingExtraAttacks() const { return m_extraAttacksExecuting; }
 
         bool IsAttackedBy(Unit* attacker) const
         {
@@ -1525,6 +1526,10 @@ class Unit : public WorldObject
         float CalculateEffectiveParryChance(const Unit* attacker, WeaponAttackType attType, const SpellEntry* ability = nullptr) const;
         float CalculateEffectiveBlockChance(const Unit* attacker, WeaponAttackType attType, const SpellEntry* ability = nullptr) const;
         float CalculateEffectiveCrushChance(const Unit* victim, WeaponAttackType attType) const;
+        // custom: percent carried by the effect 2 dummy of a paladin talent (ranks firstId..lastId: Anticipation, Shield Specialization)
+        int32 GetPaladinTalentDummyPercent(uint32 firstId, uint32 lastId) const;
+        // custom: damage a block stops - block value plus the Shield Specialization percent of the rest
+        uint32 CalculateBlockedAmount(uint32 damage) const;
         float CalculateEffectiveGlanceChance(const Unit* victim, WeaponAttackType attType) const;
         float CalculateEffectiveDazeChance(const Unit* victim, WeaponAttackType attType) const;
         uint32 CalculateGlanceAmount(CalcDamageInfo* meleeInfo) const;

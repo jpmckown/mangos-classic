@@ -3107,7 +3107,8 @@ bool CooldownContainer::AddCooldown(TimePoint clockNow, uint32 spellId, uint32 d
     if (resultItr.second && spellCategory && categoryDuration)
     {
         SpellCategoryEntry const* spellCategoryEntry = sSpellCategory.LookupEntry(spellCategory);
-        if (spellCategoryEntry->flags & uint32(SpellCategoryFlags::CooldownIsGlobal))
+        // custom: a category missing from SpellCategory.dbc must not crash the world (Seal of the Crusader's 1200 did, 2026-10-02)
+        if (spellCategoryEntry && spellCategoryEntry->flags & uint32(SpellCategoryFlags::CooldownIsGlobal))
         {
             m_globalCooldown = std::chrono::milliseconds(categoryDuration) + clockNow;
             return resultItr.second;

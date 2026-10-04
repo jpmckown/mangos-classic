@@ -1430,8 +1430,8 @@ SpellAuraProcResult Unit::HandleProcTriggerSpellAuraProc(ProcExecutionData& data
             break;
         case SPELLFAMILY_PALADIN:
         {
-            // Illumination
-            if (auraSpellInfo->SpellIconID == 241)
+            // Illumination (stock mana refund; the custom rework triggers 34139 on melee crits instead)
+            if (auraSpellInfo->SpellIconID == 241 && trigger_spell_id == 18350)
             {
                 if (!spellInfo)
                     return SPELL_AURA_PROC_FAILED;
