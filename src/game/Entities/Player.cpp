@@ -12234,7 +12234,11 @@ Quest const* Player::GetNextQuest(ObjectGuid guid, Quest const* pQuest) const
     for (QuestRelationsMap::const_iterator itr = rbounds.first; itr != rbounds.second; ++itr)
     {
         if (itr->second == nextQuestID)
-            return sObjectMgr.GetQuestTemplate(nextQuestID);
+        {
+            // only offer the next quest when it can be taken now: a player below its MinLevel used to be shown it, accept it and be refused
+            Quest const* nextQuest = sObjectMgr.GetQuestTemplate(nextQuestID);
+            return nextQuest && CanTakeQuest(nextQuest, false) ? nextQuest : nullptr;
+        }
     }
 
     return nullptr;
