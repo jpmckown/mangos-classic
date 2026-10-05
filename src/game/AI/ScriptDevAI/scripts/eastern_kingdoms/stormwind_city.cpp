@@ -273,59 +273,56 @@ struct npc_dashel_stonefistAI : public CombatAI
 
     void HandleEndEvent()
     {
-        // Occurs only if thugs are alive
-        if (m_thugsAlive)
+        // stages 1-4 are the thug dialogue (JustReachedHome skips to 5 if the thugs died); 5 completes the quest
+        uint32 timer = 0;
+        switch (m_phaseThugEventStage)
         {
-            uint32 timer = 0;
-            switch (m_phaseThugEventStage)
+            case 1:
             {
-                case 1:
-                {
-                    if (Creature* thug = m_creature->GetMap()->GetCreature(m_thugs[0]))
-                        if (thug->IsAlive())
-                            DoBroadcastText(SAY_PROGRESS_4_THU, thug);
+                if (Creature* thug = m_creature->GetMap()->GetCreature(m_thugs[0]))
+                    if (thug->IsAlive())
+                        DoBroadcastText(SAY_PROGRESS_4_THU, thug);
 
-                    timer = 1500;
-                    break;
-                }
-                case 2:
-                {
-                    if (Creature* thug = m_creature->GetMap()->GetCreature(m_thugs[1]))
-                        if (thug->IsAlive())
-                            DoBroadcastText(SAY_PROGRESS_5_THU, thug);
-
-                    // switch phase
-                    timer = 1000;
-                    break;
-                }
-                case 3:
-                {
-                    ResetThug(0);
-                    timer = 1500;
-                    break;
-                }
-                case 4:
-                {
-                    ResetThug(1);
-                    timer = 1000;
-                    break;
-                }
-                case 5:
-                {
-                    // Set quest completed
-                    if (Player* player = m_creature->GetMap()->GetPlayer(m_playerGuid))
-                        player->AreaExploredOrEventHappens(QUEST_MISSING_DIPLO_PT8);
-
-                    Reset();
-                    break;
-                }
-                default: 
-                    break;
+                timer = 1500;
+                break;
             }
-            ++m_phaseThugEventStage;
-            if (timer)
-                ResetTimer(DASHEL_END_EVENT, timer);
+            case 2:
+            {
+                if (Creature* thug = m_creature->GetMap()->GetCreature(m_thugs[1]))
+                    if (thug->IsAlive())
+                        DoBroadcastText(SAY_PROGRESS_5_THU, thug);
+
+                // switch phase
+                timer = 1000;
+                break;
+            }
+            case 3:
+            {
+                ResetThug(0);
+                timer = 1500;
+                break;
+            }
+            case 4:
+            {
+                ResetThug(1);
+                timer = 1000;
+                break;
+            }
+            case 5:
+            {
+                // Set quest completed
+                if (Player* player = m_creature->GetMap()->GetPlayer(m_playerGuid))
+                    player->AreaExploredOrEventHappens(QUEST_MISSING_DIPLO_PT8);
+
+                Reset();
+                break;
+            }
+            default: 
+                break;
         }
+        ++m_phaseThugEventStage;
+        if (timer)
+            ResetTimer(DASHEL_END_EVENT, timer);
     }
     void JustDied(Unit* /*pUnit*/) override
     {
