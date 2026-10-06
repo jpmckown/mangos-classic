@@ -350,7 +350,9 @@ bool Creature::InitEntry(uint32 Entry, CreatureData const* data /*=nullptr*/, Ga
         return false;
     }
 
-    CreatureModelInfo const* minfo = sObjectMgr.GetCreatureModelRandomGender(display_id);
+    // a model with an opposite-gender twin is swapped for it half the time, unless the creature's gender is fixed
+    CreatureModelInfo const* minfo = (cinfo->ExtraFlags & CREATURE_EXTRA_FLAG_FIXED_GENDER)
+        ? sObjectMgr.GetCreatureModelInfo(display_id) : sObjectMgr.GetCreatureModelRandomGender(display_id);
     if (!minfo)                                             // Cancel load if no model defined
     {
         sLog.outErrorDb("Creature (Entry: %u) has no model info defined in table `creature_model_info`, can't load.", Entry);
