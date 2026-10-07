@@ -2039,6 +2039,13 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
                 pGo->Respawn();
             else
             {
+                // a button despawned while still used (e.g. Incantation of Celebras despawns itself 3.5 s after use) keeps
+                // its open state and in-use flag; the timed respawn in GameObject::Update resets them, this path did not
+                if (pGo->GetGoType() == GAMEOBJECT_TYPE_BUTTON && pGo->GetGoState() != GO_STATE_READY)
+                {
+                    pGo->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_IN_USE);
+                    pGo->SetGoState(GO_STATE_READY);
+                }
                 pGo->SetLootState(GO_READY);
                 pGo->SetRespawnTime(time_to_despawn);           // despawn object in ? seconds
                 pGo->Refresh();
