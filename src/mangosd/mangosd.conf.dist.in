@@ -235,6 +235,18 @@ Spawns.ZoneArea = 0
 #        Default: 1 (permit addon channel)
 #                 0 (do not permit addon channel)
 #
+#    TargetCastInfo
+#        Send players the cast of their selected unit (spell, cast time, pushback, interrupt) as an
+#        addon message with prefix "TCB", for a client-side target cast bar addon. Players never see it.
+#        Default: 1 (enable)
+#                 0 (disable)
+#
+#    TargetCastInfo.ChatType
+#        Chat message type of the TargetCastInfo messages (CHAT_MSG_* value).
+#        Default: 1 (party addon message)
+#                 6 (whisper addon message)
+#                 10 (system message; the addon hides it from the chat frame)
+#
 #    CleanCharacterDB
 #        Perform character db cleanups on start up
 #        Default: 1 (Enable)
@@ -275,6 +287,8 @@ UpdateUptimeInterval = 10
 MapUpdate.Threads = 3
 MaxCoreStuckTime = 0
 AddonChannel = 1
+TargetCastInfo = 1
+TargetCastInfo.ChatType = 1
 CleanCharacterDB = 1
 MaxWhoListReturns = 49
 

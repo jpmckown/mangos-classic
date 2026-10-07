@@ -2465,6 +2465,21 @@ class Player : public Unit
 
         CinematicMgrUPtr m_cinematicMgr;
 
+        // Target cast bar: the selected unit's cast as last sent to the client (see UpdateTargetCastInfo)
+        struct TargetCastState
+        {
+            ObjectGuid caster;
+            Spell const* spell = nullptr;
+            uint32 spellId = 0;
+            uint32 endTime = 0;                             // WorldTimer ms when the cast is due to end
+            uint32 pollTime = 0;
+            uint32 remaining = 0;                           // ms left at pollTime
+        };
+        TargetCastState m_targetCast;
+        uint32 m_targetCastTimer = 0;
+        void UpdateTargetCastInfo(uint32 diff);
+        void SendTargetCastInfo(std::string const& msg) const;
+
         void AdjustQuestReqItemCount(Quest const* pQuest, QuestStatusData& questStatusData);
 
         void SetCanDelayTeleport(bool setting) { m_bCanDelayTeleport = setting; }

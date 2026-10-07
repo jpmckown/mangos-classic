@@ -1383,6 +1383,8 @@ void Player::Update(const uint32 diff)
     if (WorldSession* session = GetSession())
         session->m_ticketSquelchTimer.Update(diff);
 
+    UpdateTargetCastInfo(diff);
+
     // Undelivered mail
     if (m_nextMailDelivereTime && m_nextMailDelivereTime <= time(nullptr))
     {
@@ -20587,4 +20589,95 @@ void Player::UpdateRangedWeaponDependantAmmoHasteAura()
             ApplyAttackTimePercentMod(RANGED_ATTACK, float(highest), true);
         SetHighestAmmoMod(highest);
     }
+}
+
+// Target cast bar: tells the client what its selected unit is casting, since the 1.12 client has no API for it.
+// Sent as addon messages with prefix "TCB" (or as system messages the addon hides, see TargetCastInfo.ChatType):
+//   S;<total ms>;<remaining ms>;<c = cast | h = channel>;<interruptible 0/1>;<caster name>;<spell name>
+//       on a new cast, on target change to a unit already casting, and on pushback
+//   E;<D = done | I = interrupted or cancelled | X = target changed or lost>
+void Player::UpdateTargetCastInfo(uint32 diff)
+{
+    if (!sWorld.getConfig(CONFIG_BOOL_TARGET_CAST_INFO))
+        return;
+
+#ifdef ENABLE_PLAYERBOTS
+    if (GetPlayerbotAI())
+        return;
+#endif
+
+    m_targetCastTimer += diff;
+    if (m_targetCastTimer < 100)
+        return;
+    m_targetCastTimer = 0;
+
+    ObjectGuid const& guid = GetSelectionGuid();
+    if (!guid && !m_targetCast.spellId)
+        return;
+
+    Spell const* spell = nullptr;
+    bool channel = false;
+    Unit* target = guid && guid != GetObjectGuid() ? GetMap()->GetUnit(guid) : nullptr;
+    if (target)
+    {
+        Spell const* cast = target->GetCurrentSpell(CURRENT_GENERIC_SPELL);
+        Spell const* channeled = target->GetCurrentSpell(CURRENT_CHANNELED_SPELL);
+        if (cast && (cast->getState() == SPELL_STATE_CASTING || cast->getState() == SPELL_STATE_DELAYED) && cast->GetCastTime() > 0)
+            spell = cast;
+        else if (channeled && channeled->getState() == SPELL_STATE_CHANNELING && channeled->GetChannelDuration() > 0)
+        {
+            spell = channeled;
+            channel = true;
+        }
+    }
+
+    uint32 now = WorldTimer::getMSTime();
+
+    if (spell)
+    {
+        uint32 remaining = spell->GetCastedTime();
+        uint32 endTime = now + remaining;
+        bool changed = guid != m_targetCast.caster || spell != m_targetCast.spell || spell->m_spellInfo->Id != m_targetCast.spellId
+            || std::abs(int32(endTime - m_targetCast.endTime)) > 150;
+
+        if (changed)
+        {
+            uint32 total = channel ? uint32(spell->GetChannelDuration()) : uint32(spell->GetCastTime());
+            std::ostringstream msg;
+            msg << "S;" << std::max(total, remaining) << ';' << remaining << ';' << (channel ? 'h' : 'c') << ';' << (spell->IsInterruptible() ? 1 : 0)
+                << ';' << target->GetName() << ';' << spell->m_spellInfo->SpellName[GetSession()->GetSessionDbcLocale()];
+            SendTargetCastInfo(msg.str());
+            m_targetCast.endTime = endTime;
+        }
+
+        m_targetCast.caster = guid;
+        m_targetCast.spell = spell;
+        m_targetCast.spellId = spell->m_spellInfo->Id;
+        m_targetCast.pollTime = now;
+        m_targetCast.remaining = remaining;
+        return;
+    }
+
+    if (!m_targetCast.spellId)
+        return;
+
+    char result = 'X';
+    if (guid == m_targetCast.caster)
+        result = WorldTimer::getMSTimeDiff(m_targetCast.pollTime, now) + 150 >= m_targetCast.remaining ? 'D' : 'I';
+
+    SendTargetCastInfo(std::string("E;") + result);
+    m_targetCast = TargetCastState();
+}
+
+void Player::SendTargetCastInfo(std::string const& msg) const
+{
+    ChatMsg type = ChatMsg(sWorld.getConfig(CONFIG_UINT32_TARGET_CAST_INFO_CHAT_TYPE));
+    std::string text = "TCB\t" + msg;
+
+    WorldPacket data;
+    if (type == CHAT_MSG_SYSTEM)
+        ChatHandler::BuildChatPacket(data, type, text.c_str());
+    else
+        ChatHandler::BuildChatPacket(data, type, text.c_str(), LANG_ADDON, CHAT_TAG_NONE, GetObjectGuid(), GetName());
+    GetSession()->SendPacket(data);
 }
