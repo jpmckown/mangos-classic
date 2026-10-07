@@ -19166,13 +19166,15 @@ void Player::UpdateTerainEnvironmentFlags(Map* m, float x, float y, float z)
     if (liquid_status.type_flags & (MAP_LIQUID_TYPE_WATER | MAP_LIQUID_TYPE_OCEAN))
         SetEnvironmentFlags(ENVIRONMENT_FLAG_IN_WATER, (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER)));
 
-    // In magma: on, under, or slightly above surface level
-    if (liquid_status.type_flags & MAP_LIQUID_TYPE_MAGMA)
-        SetEnvironmentFlags(ENVIRONMENT_FLAG_IN_MAGMA, (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER | LIQUID_MAP_WATER_WALK)));
+    // In magma/slime: under or on the surface. LIQUID_MAP_WATER_WALK spans a full yard above it, which burned players
+    // standing on objects that clear the lava (e.g. the Twilight Artifact crystal in Searing Gorge, top 0.66 yd above it)
+    bool onHazardSurface = (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER)) || ((res & LIQUID_MAP_WATER_WALK) && z < liquid_status.level + 0.1f);
 
-    // In slime: on, under, or slightly above surface level
+    if (liquid_status.type_flags & MAP_LIQUID_TYPE_MAGMA)
+        SetEnvironmentFlags(ENVIRONMENT_FLAG_IN_MAGMA, onHazardSurface);
+
     if (liquid_status.type_flags & MAP_LIQUID_TYPE_SLIME)
-        SetEnvironmentFlags(ENVIRONMENT_FLAG_IN_SLIME, (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER | LIQUID_MAP_WATER_WALK)));
+        SetEnvironmentFlags(ENVIRONMENT_FLAG_IN_SLIME, onHazardSurface);
 
     // In deep water: on, under, above surface level
     SetEnvironmentFlags(ENVIRONMENT_FLAG_HIGH_SEA, (liquid_status.type_flags & MAP_LIQUID_TYPE_DEEP_WATER));
