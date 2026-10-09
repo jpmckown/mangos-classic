@@ -443,7 +443,7 @@ struct ArdentDefender : public AuraScript
         currentAbsorb = 0;
         if (target->GetHealth() * 100 < target->GetMaxHealth() * 35)
             currentAbsorb = remainingDamage * aura->GetModifier()->m_amount / 100;
-        if (aura->GetId() == 20137 && !target->HasAura(34140))
+        if (aura->GetId() == 34154 && !target->HasAura(34140))   // rank 3 of the row 6 talent (2026-10-07; was rank 5 of row 1)
             preventedDeath = true;
     }
 
@@ -456,6 +456,39 @@ struct ArdentDefender : public AuraScript
         target->CastSpell(target, 34140, TRIGGERED_OLD_TRIGGERED);
         if (health < floor)
             target->DealHeal(target, floor - health, sSpellTemplate.LookupEntry<SpellEntry>(34140));
+    }
+};
+
+// 34150 - Divine Storm (custom 2026-10-07, replaces Repentance on Retribution's last row): heals the paladin for 25% of
+// the damage it deals. Each target's damage is summed in the spell's script value and healed once when the cast finishes.
+struct DivineStorm : public SpellScript
+{
+    void OnHit(Spell* spell, SpellMissInfo /*missInfo*/) const override
+    {
+        if (spell->GetTotalTargetDamage() > 0)
+            spell->SetScriptValue(spell->GetScriptValue() + uint64(spell->GetTotalTargetDamage()));
+    }
+
+    void OnSuccessfulFinish(Spell* spell) const override
+    {
+        Unit* caster = spell->GetCaster();
+        uint32 heal = uint32(spell->GetScriptValue() * 25 / 100);
+        if (!caster || !caster->IsAlive() || !heal)
+            return;
+        caster->DealHeal(caster, heal, sSpellTemplate.LookupEntry<SpellEntry>(34151));
+        caster->PlaySpellVisual(6811);   // WotLK Divine Storm heal effect (client SpellVisualKit 6811)
+    }
+};
+
+// 20177, 20179, 20180, 20181, 20182 - Reckoning (custom 2026-10-07): the extra attack comes at the talent's chance after a
+// critical strike taken, and at half that chance after a block (spell_proc_event 20177 allows crit + block)
+struct Reckoning : public AuraScript
+{
+    bool OnCheckProc(Aura* /*aura*/, ProcExecutionData& data) const override
+    {
+        if ((data.procExtra & PROC_EX_BLOCK) && !(data.procExtra & PROC_EX_CRITICAL_HIT))
+            return roll_chance_i(50);
+        return true;
     }
 };
 
@@ -476,4 +509,6 @@ void LoadPaladinScripts()
     RegisterSpellScript<ImprovedDevotionAura>("spell_paladin_improved_devotion_aura");
     RegisterSpellScript<ArdentDefender>("spell_paladin_ardent_defender");
     RegisterSpellScript<SealOfJustice>("spell_paladin_seal_of_justice");
+    RegisterSpellScript<DivineStorm>("spell_paladin_divine_storm");
+    RegisterSpellScript<Reckoning>("spell_paladin_reckoning");
 }

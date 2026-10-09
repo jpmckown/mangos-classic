@@ -528,6 +528,10 @@ Unit::SpellProcEventTriggerCheck Unit::IsTriggeredAtSpellProcEvent(ProcExecution
     if (!EventProcFlag)
         return SpellProcEventTriggerCheck::SPELL_PROC_TRIGGER_FAILED;
 
+    // custom (2026-10-07): Divine Storm 34150 triggers the paladin's other procs (Vengeance, Illumination), but not seals
+    if (!data.isVictim && data.spellInfo && data.spellInfo->Id == 34150 && IsSealSpell(spellProto))
+        return SpellProcEventTriggerCheck::SPELL_PROC_TRIGGER_FAILED;
+
     // Check spellProcEvent data requirements
     if (!SpellMgr::IsSpellProcEventCanTriggeredBy(spellProcEvent, EventProcFlag, data.spellInfo, data.procFlags, data.procExtra))
         return SpellProcEventTriggerCheck::SPELL_PROC_TRIGGER_FAILED;
