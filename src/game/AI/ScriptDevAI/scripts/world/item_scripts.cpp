@@ -421,6 +421,18 @@ struct LinkensBoomerang : public SpellScript
     }
 };
 
+// 34247 - Flask of Purity (custom): can't be drunk in a battleground; an active flask goes dormant there (Unit::IsImmuneToDispellableDebuffs)
+struct FlaskOfPurity : public SpellScript
+{
+    SpellCastResult OnCheckCast(Spell* spell, bool /*strict*/) const override
+    {
+        Unit* caster = spell->GetCaster();
+        if (caster && caster->IsInWorld() && caster->GetMap()->IsBattleGround())
+            return SPELL_FAILED_NOT_HERE;
+        return SPELL_CAST_OK;
+    }
+};
+
 void AddSC_item_scripts()
 {
     Script* pNewScript = new Script;
@@ -444,4 +456,5 @@ void AddSC_item_scripts()
     RegisterSpellScript<ToshleysStationTransporter>("spell_toshleys_station_transporter");
     RegisterSpellScript<Area52Transporter>("spell_area52_transporter");
     RegisterSpellScript<LinkensBoomerang>("spell_linkens_boomerang");
+    RegisterSpellScript<FlaskOfPurity>("spell_flask_of_purity");
 }

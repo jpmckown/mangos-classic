@@ -7467,9 +7467,13 @@ bool Unit::IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex i
 
 // custom (Flask of Purity 34247): SPELL_AURA_DISPEL_IMMUNITY with DISPEL_ALL makes the unit immune to the harmful auras of
 // magic, curse, disease and poison spells. Stock dispel immunity matches one Dispel type and blocks the whole spell, buffs too.
+// Dormant in battlegrounds: the aura stays on and works again outside (spell_flask_of_purity refuses the drink inside)
 bool Unit::IsImmuneToDispellableDebuffs(SpellEntry const* spellInfo) const
 {
     if (!((1 << spellInfo->Dispel) & DISPEL_ALL_MASK))
+        return false;
+
+    if (IsInWorld() && GetMap()->IsBattleGround())
         return false;
 
     for (auto const& itr : m_spellImmune[IMMUNITY_DISPEL])
