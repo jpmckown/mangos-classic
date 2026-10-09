@@ -2230,6 +2230,7 @@ class Unit : public WorldObject
         virtual bool IsImmuneToDamage(SpellSchoolMask meleeSchoolMask);
         virtual bool IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex index, bool castOnSelf) const;
         bool IsImmuneToSchool(SpellEntry const* spellInfo, uint8 effectMask) const;
+        bool IsImmuneToDispellableDebuffs(SpellEntry const* spellInfo) const;
 
         static float CalcArmorReducedDamage(WorldObject* attacker, Unit* victim, const float damage);
         void CalculateDamageAbsorbAndResist(Unit* caster, SpellSchoolMask schoolMask, DamageEffectType damagetype, const uint32 damage, uint32* absorb, int32* resist, bool canReflect = false, bool canResist = true, bool binary = false);

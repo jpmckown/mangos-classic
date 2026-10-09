@@ -7377,7 +7377,7 @@ bool Unit::IsImmuneToDamage(SpellSchoolMask shoolMask)
     return false;
 }
 
-bool Unit::IsImmuneToSpell(SpellEntry const* spellInfo, bool /*castOnSelf*/, uint8 effectMask, WorldObject const* caster)
+bool Unit::IsImmuneToSpell(SpellEntry const* spellInfo, bool castOnSelf, uint8 effectMask, WorldObject const* caster)
 {
     if (!spellInfo)
         return false;
@@ -7389,6 +7389,12 @@ bool Unit::IsImmuneToSpell(SpellEntry const* spellInfo, bool /*castOnSelf*/, uin
     for (auto itr : dispelList)
         if (itr.type == spellInfo->Dispel)
             return true;
+
+    // custom: a spell that only applies harmful dispellable auras misses outright (mixed spells lose just the auras, see IsImmuneToSpellEffect)
+    if (!castOnSelf && !spellInfo->HasAttribute(SPELL_ATTR_NO_IMMUNITIES) && IsImmuneToDispellableDebuffs(spellInfo) &&
+        IsAuraApplyEffects(spellInfo, SpellEffectIndexMask(effectMask)) &&
+        (spellInfo->HasAttribute(SPELL_ATTR_AURA_IS_DEBUFF) || !IsPositiveEffectMask(spellInfo, effectMask, caster, this)))
+        return true;
 
     {
         bool isPositive = IsPositiveEffectMask(spellInfo, effectMask, caster, this);
@@ -7419,10 +7425,15 @@ bool Unit::IsImmuneToSpell(SpellEntry const* spellInfo, bool /*castOnSelf*/, uin
     return false;
 }
 
-bool Unit::IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex index, bool /*castOnSelf*/) const
+bool Unit::IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex index, bool castOnSelf) const
 {
     if (spellInfo->HasAttribute(SPELL_ATTR_NO_IMMUNITIES))
         return false;
+
+    // custom: harmful dispellable auras don't land, the spell's other effects (damage) still do
+    if (!castOnSelf && IsAuraApplyEffect(spellInfo, index) && IsImmuneToDispellableDebuffs(spellInfo) &&
+        (spellInfo->HasAttribute(SPELL_ATTR_AURA_IS_DEBUFF) || !IsPositiveEffect(spellInfo, index)))
+        return true;
 
     // If m_immuneToEffect type contain this effect type, IMMUNE effect.
     uint32 effect = spellInfo->Effect[index];
@@ -7451,6 +7462,20 @@ bool Unit::IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex i
             if (itr.type == aura)
                 return true;
     }
+    return false;
+}
+
+// custom (Flask of Purity 34247): SPELL_AURA_DISPEL_IMMUNITY with DISPEL_ALL makes the unit immune to the harmful auras of
+// magic, curse, disease and poison spells. Stock dispel immunity matches one Dispel type and blocks the whole spell, buffs too.
+bool Unit::IsImmuneToDispellableDebuffs(SpellEntry const* spellInfo) const
+{
+    if (!((1 << spellInfo->Dispel) & DISPEL_ALL_MASK))
+        return false;
+
+    for (auto const& itr : m_spellImmune[IMMUNITY_DISPEL])
+        if (itr.type == DISPEL_ALL)
+            return true;
+
     return false;
 }
 
