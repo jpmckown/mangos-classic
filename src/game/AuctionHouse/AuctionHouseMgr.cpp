@@ -420,12 +420,14 @@ void AuctionHouseMgr::LoadAuctions()
 void AuctionHouseMgr::AddAItem(Item* it)
 {
     MANGOS_ASSERT(it);
+    sAuctionService.CheckWorldThread("AuctionHouseMgr::AddAItem");
     MANGOS_ASSERT(mAitems.find(it->GetGUIDLow()) == mAitems.end());
     mAitems[it->GetGUIDLow()] = it;
 }
 
 bool AuctionHouseMgr::RemoveAItem(uint32 id)
 {
+    sAuctionService.CheckWorldThread("AuctionHouseMgr::RemoveAItem");
     ItemMap::iterator i = mAitems.find(id);
     if (i == mAitems.end())
     {
@@ -777,6 +779,8 @@ void AuctionEntry::AuctionBidWinning(Player* newbidder)
 
 bool AuctionEntry::UpdateBid(uint32 newbid, Player* newbidder /*=nullptr*/)
 {
+    sAuctionService.CheckWorldThread("AuctionEntry::UpdateBid");
+
     Player* auction_owner = owner ? sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, owner)) : nullptr;
 
     // bid can't be greater buyout

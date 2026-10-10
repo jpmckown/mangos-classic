@@ -21,6 +21,7 @@
 
 #include "Common.h"
 #include "Server/DBCStructure.h"
+#include "AuctionHouse/AuctionService.h"
 
 class Item;
 class Player;
@@ -101,6 +102,7 @@ class AuctionHouseObject
         void AddAuction(AuctionEntry* ah)
         {
             MANGOS_ASSERT(ah);
+            sAuctionService.CheckWorldThread("AuctionHouseObject::AddAuction");
             AuctionsMap[ah->Id] = ah;
         }
 
@@ -110,7 +112,11 @@ class AuctionHouseObject
             return itr != AuctionsMap.end() ? itr->second : nullptr;
         }
 
-        bool RemoveAuction(uint32 id) { return !!AuctionsMap.erase(id); }
+        bool RemoveAuction(uint32 id)
+        {
+            sAuctionService.CheckWorldThread("AuctionHouseObject::RemoveAuction");
+            return !!AuctionsMap.erase(id);
+        }
 
         void Update();
 

@@ -219,6 +219,9 @@ class ChatHandler
         bool HandleAuctionGoblinCommand(char* args);
         bool HandleAuctionHordeCommand(char* args);
         bool HandleAuctionItemCommand(char* args);
+        bool HandleAhMarketPassCommand(char* args);
+        bool HandleAhMarketReloadCommand(char* args);
+        bool HandleAhMarketStatusCommand(char* args);
         bool HandleAuctionCommand(char* args);
 
         bool HandleWarnCharacterCommand(char* args);

@@ -1824,5 +1824,81 @@ Metric.Database = "perfd"
 Metric.Username = ""
 Metric.Password = ""
 
+###################################################################################################################
+# AH MARKET (fork: claude-projects/ah-market)
+#
+#    AhMarket.Enable
+#        Keep the auction houses stocked from the curated catalog (world DB ahmarket_catalog / ahmarket_tier,
+#        custom-content/AH_MARKET_CATALOG.sql). Listings are sold under random bot characters.
+#        Default: 0 (disable)
+#                 1 (enable)
+#
+#    AhMarket.PassInterval
+#        Seconds between passes. Each pass handles one auction house; the houses take turns.
+#        Default: 20
+#
+#    AhMarket.MaxPostsPerPass
+#        Most new listings one pass may create (an empty house fills over several passes).
+#        Default: 60
+#
+#    AhMarket.RestockChance
+#        Chance per pass that an item between its minimum and maximum listings gets one more.
+#        Default: 0.25
+#
+#    AhMarket.Price.SoldStep
+#    AhMarket.Price.ExpiredStep
+#    AhMarket.Price.MinFactor
+#    AhMarket.Price.MaxFactor
+#        Each item's price drifts per house: x(1 + SoldStep) when a listing sells, x(1 - ExpiredStep) when one is
+#        taken down unsold, kept between MinFactor and MaxFactor of the catalog price.
+#        Default: 0.05, 0.03, 0.5, 2.0
+#
+#    AhMarket.Buyer.Enable
+#        Buy player listings: catalog items at up to CatalogRatio x market price, anything else that isn't
+#        junk (grey items, white weapons and armor, quest items, keys) at up to VendorMultiplier x vendor sell price.
+#        Default: 0 (disable)
+#                 1 (enable)
+#
+#    AhMarket.Buyer.DelayMin
+#    AhMarket.Buyer.DelayMax
+#        Seconds a player listing waits before the buyer decides on it (random in this range).
+#        Default: 600, 3600
+#
+#    AhMarket.Buyer.CatalogRatio
+#        Most the buyer pays for a catalog item, as a share of its current market price. Keep it below
+#        1 - tier spread, or buying from the bot and selling back to it turns a profit.
+#        Default: 0.75
+#
+#    AhMarket.Buyer.VendorMultiplier.Common
+#    AhMarket.Buyer.VendorMultiplier.Uncommon
+#    AhMarket.Buyer.VendorMultiplier.Rare
+#    AhMarket.Buyer.VendorMultiplier.Epic
+#        Most the buyer pays for an item outside the catalog, as a multiple of its vendor sell price, by quality.
+#        Default: 2, 3, 5, 8
+#
+#    AhMarket.Buyer.DailyBudget
+#        Gold the buyer may spend per auction house per day.
+#        Default: 500
+#
+###################################################################################################################
+
+AhMarket.Enable = 0
+AhMarket.PassInterval = 20
+AhMarket.MaxPostsPerPass = 60
+AhMarket.RestockChance = 0.25
+AhMarket.Price.SoldStep = 0.05
+AhMarket.Price.ExpiredStep = 0.03
+AhMarket.Price.MinFactor = 0.5
+AhMarket.Price.MaxFactor = 2.0
+AhMarket.Buyer.Enable = 0
+AhMarket.Buyer.DelayMin = 600
+AhMarket.Buyer.DelayMax = 3600
+AhMarket.Buyer.CatalogRatio = 0.75
+AhMarket.Buyer.VendorMultiplier.Common = 2
+AhMarket.Buyer.VendorMultiplier.Uncommon = 3
+AhMarket.Buyer.VendorMultiplier.Rare = 5
+AhMarket.Buyer.VendorMultiplier.Epic = 8
+AhMarket.Buyer.DailyBudget = 500
+
 Dummy.Debug1 = 0
 Dummy.Debug2 = 0

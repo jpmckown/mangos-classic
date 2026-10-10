@@ -64,6 +64,7 @@
 #include "World/WorldStateExpression.h"
 
 #include "MotionGenerators/MoveMap.h"
+#include "AuctionHouse/AuctionMarket.h"
 
 #ifdef BUILD_AHBOT
 #include "AuctionHouseBot/AuctionHouseBot.h"
@@ -4173,6 +4174,28 @@ bool ChatHandler::HandleAuctionCommand(char* /*args*/)
     m_session->SendAuctionHello(m_session->GetPlayer());
 
     return true;
+}
+
+bool ChatHandler::HandleAhMarketStatusCommand(char* /*args*/)
+{
+    std::istringstream status(sAuctionMarket.GetStatus());
+    std::string line;
+    while (std::getline(status, line))
+        SendSysMessage(line.c_str());
+    return true;
+}
+
+bool ChatHandler::HandleAhMarketReloadCommand(char* /*args*/)
+{
+    sAuctionMarket.Load();
+    SendSysMessage("AH market config, catalog and price factors reloaded (run .reload config first for mangosd.conf changes)");
+    return true;
+}
+
+bool ChatHandler::HandleAhMarketPassCommand(char* /*args*/)
+{
+    sAuctionMarket.RunAllHouses();
+    return HandleAhMarketStatusCommand(nullptr);
 }
 
 bool ChatHandler::HandleAuctionItemCommand(char* args)
