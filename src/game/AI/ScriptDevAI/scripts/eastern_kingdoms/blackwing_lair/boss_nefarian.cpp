@@ -25,6 +25,7 @@ EndScriptData
 
 #include "AI/ScriptDevAI/include/sc_common.h"
 #include "blackwing_lair.h"
+#include "AI/ScriptDevAI/include/sc_solo_scaling.h"
 #include "Entities/TemporarySpawn.h"
 #include "AI/ScriptDevAI/base/CombatAI.h"
 #include "MotionGenerators/WaypointManager.h"
@@ -262,12 +263,24 @@ struct boss_nefarianAI : public CombatAI
             }
             case NEFARIAN_CLASS_CALL:
             {
-                // Cast a random class call based on what classes are currently on the hostile list
-                if (Unit* target = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0, uint32(0), SELECT_FLAG_PLAYER))
+                // Cast a random class call based on what classes are currently on the hostile list.
+                // Fork: with fewer than 10 players, call a random class instead, so a small group isn't hit
+                // by its own classes every time (most calls then hit nobody, but he still yells them).
+                uint8 calledClass = 0;
+                bool randomClass = GetEncounterPlayerCount(m_creature->GetMap()) < 10;
+                if (randomClass)
+                {
+                    static const uint8 classes[] = { CLASS_WARRIOR, CLASS_PALADIN, CLASS_HUNTER, CLASS_ROGUE, CLASS_PRIEST, CLASS_SHAMAN, CLASS_MAGE, CLASS_WARLOCK, CLASS_DRUID };
+                    calledClass = classes[urand(0, 8)];
+                }
+                else if (Unit* target = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0, uint32(0), SELECT_FLAG_PLAYER))
+                    calledClass = target->getClass();
+
+                if (calledClass)
                 {
                     uint32 spellId = 0;
                     int32 textId = -1;
-                    switch (target->getClass())
+                    switch (calledClass)
                     {
                         case CLASS_WARRIOR: spellId = SPELL_WARRIOR; textId = SAY_WARRIOR; break;
                         case CLASS_PALADIN: spellId = SPELL_PALADIN; textId = SAY_PALADIN; break;
@@ -284,6 +297,9 @@ struct boss_nefarianAI : public CombatAI
                         DoScriptText(textId, m_creature);
                         ResetCombatAction(action, urand(35000, 40000));
                     }
+                    // Fork: a random call never retries (a retry would re-roll until it hit the player's class)
+                    else if (randomClass)
+                        ResetCombatAction(action, urand(35000, 40000));
                 }
                 break;
             }
